@@ -1,0 +1,55 @@
+{{define "device-detail-content"}}
+<div id="device-detail-page" class="max-w-3xl mx-auto">
+    <!-- Loading -->
+    <div id="dd-loading" class="text-center py-12">
+        <div class="spinner mx-auto mb-4"></div>
+        <p style="color: #94a3b8;">Loading device...</p>
+    </div>
+
+    <!-- Error -->
+    <div id="dd-error" class="hidden mb-6 p-4 rounded-lg text-sm"
+         style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171;">
+    </div>
+
+    <!-- Content -->
+    <div id="dd-content" class="hidden">
+        <div class="mb-4">
+            <a href="/devices" class="text-sm" style="color: #64748b; text-decoration: none;">&larr; Back to Devices</a>
+        </div>
+
+        <!-- Header card -->
+        <div class="device-card px-5 py-4 mb-4">
+            <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center space-x-3">
+                    <span class="device-card-name text-lg" id="dd-name">--</span>
+                    <span id="dd-online" class="text-xs px-2 py-0.5 rounded"></span>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <button onclick="ddRefreshState(this)" class="text-xs px-3 py-1.5 rounded transition-colors"
+                            style="background: rgba(51, 65, 85, 0.5); color: #e2e8f0; border: 1px solid rgba(71, 85, 105, 0.5); cursor: pointer;">
+                        Refresh State
+                    </button>
+                    <button onclick="ddTestBlink(this)" class="text-xs px-3 py-1.5 rounded transition-colors"
+                            style="background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); cursor: pointer;">
+                        Test Blink
+                    </button>
+                </div>
+            </div>
+            <div class="data-row"><span class="data-label">Model</span><span class="data-value" id="dd-sku">--</span></div>
+            <div class="data-row"><span class="data-label">Device ID</span><span class="data-value text-xs" id="dd-id">--</span></div>
+            <div class="data-row"><span class="data-label">Assigned scene</span>
+                <span class="data-value">
+                    <select id="dd-assigned-scene" class="settings-select text-xs"
+                            onfocus="ddLoadAssignedSceneOptions(this)" onchange="ddSaveAssignedScene(this)"></select>
+                </span>
+            </div>
+            <p id="dd-stale" class="hidden text-xs mt-2" style="color: #facc15;">
+                Device is offline — reported state is historical and may not reflect reality.
+            </p>
+        </div>
+
+        <!-- Controls (widget registry renders here) -->
+        <div id="dd-controls"></div>
+    </div>
+</div>
+{{end}}

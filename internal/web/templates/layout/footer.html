@@ -1,0 +1,46 @@
+{{define "footer"}}
+<footer style="background: rgba(30, 41, 59, 0.4); border-top: 1px solid rgba(51, 65, 85, 0.5); margin-top: 3rem;">
+    <div class="container mx-auto px-4 py-6">
+        <div class="flex flex-col md:flex-row justify-between items-center">
+            <div class="flex items-center text-sm" style="color: #94a3b8;">
+                <img src="/static/img/MMFPSolutions-Full-Color-100-100.jpeg" alt="MMFP Solutions" class="h-8 w-8 rounded mr-2">
+                &copy; 2026&nbsp;<a href="https://www.mmfpsolutions.io" target="_blank" style="color: #60a5fa;" rel="noopener">MMFP Solutions</a>
+                <!-- VEO tag — purely decorative, no aria/title so it's just a visual mark. -->
+                <svg width="13" height="26" viewBox="0 0 100 200" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="margin-left: 0.6rem; opacity: 0.65;">
+                    <g stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none">
+                        <path d="M24 22 L76 22 L50 58 Z"/>
+                        <line x1="30" y1="82" x2="70" y2="82"/>
+                        <line x1="30" y1="98" x2="70" y2="98"/>
+                        <line x1="30" y1="114" x2="70" y2="114"/>
+                        <circle cx="50" cy="162" r="26"/>
+                    </g>
+                    <circle cx="50" cy="162" r="5" fill="currentColor"/>
+                </svg>
+            </div>
+            <div class="text-sm mt-2 md:mt-0" style="color: #64748b;">
+                <a href="/activity" class="transition-colors hover:underline" style="color: #64748b;">Activity</a>
+                <span class="mx-1">|</span>
+                <a href="/settings" class="transition-colors hover:underline" style="color: #64748b;">Settings</a>
+                <span class="mx-1">|</span>
+                <span id="footer-version" style="color: #64748b;"></span>
+            </div>
+        </div>
+    </div>
+</footer>
+
+<!-- Footer: fetch version -->
+<script>
+(async function() {
+    try {
+        const resp = await fetch('/api/v1/status');
+        if (!resp.ok) return;
+        const json = await resp.json();
+        const status = json.data;
+        if (status.version) {
+            var fv = document.getElementById('footer-version');
+            if (fv) fv.textContent = status.version;
+        }
+    } catch (e) {}
+})();
+</script>
+{{end}}

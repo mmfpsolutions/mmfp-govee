@@ -1,0 +1,76 @@
+{{define "base"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}}</title>
+
+    <!-- Favicons -->
+    <link rel="icon" type="image/x-icon" href="/static/img/favicon.ico">
+    <link rel="icon" type="image/png" sizes="16x16" href="/static/img/favicon-16x16.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="48x48" href="/static/img/favicon-48x48.png">
+    <link rel="apple-touch-icon" href="/static/img/apple-touch-icon.png">
+    <meta name="theme-color" content="#0f172a">
+
+    <!-- Tailwind CSS (compiled) -->
+    <link rel="stylesheet" href="/static/css/tailwind.css">
+
+    <!-- Dark Theme CSS -->
+    <link rel="stylesheet" href="/static/css/dark-theme.css">
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/css/custom.css">
+</head>
+<body style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%); min-height: 100vh; color: white; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; display: flex; flex-direction: column;">
+
+    {{if ne .ActivePage "login"}}{{template "header" .}}{{end}}
+
+    <main class="container mx-auto px-4 py-8" style="flex: 1;">
+        {{if eq .ActivePage "login"}}
+            {{block "login-content" .}}{{end}}
+        {{else if eq .ActivePage "devices"}}
+            {{block "devices-content" .}}{{end}}
+        {{else if eq .ActivePage "device-detail"}}
+            {{block "device-detail-content" .}}{{end}}
+        {{else if eq .ActivePage "mappings"}}
+            {{block "mappings-content" .}}{{end}}
+        {{else if eq .ActivePage "tokens"}}
+            {{block "tokens-content" .}}{{end}}
+        {{else if eq .ActivePage "activity"}}
+            {{block "activity-content" .}}{{end}}
+        {{else if eq .ActivePage "settings"}}
+            {{block "settings-content" .}}{{end}}
+        {{end}}
+    </main>
+
+    {{if ne .ActivePage "login"}}{{template "footer" .}}{{end}}
+
+    {{if eq .ActivePage "login"}}
+    <script src="/static/js/login.js"></script>
+    {{else}}
+    <!-- Shared JavaScript -->
+    <script src="/static/js/utils.js"></script>
+    <script src="/static/js/api.js"></script>
+    <script src="/static/js/header.js"></script>
+
+    <!-- Page-specific JavaScript -->
+    {{if eq .ActivePage "devices"}}
+    <script src="/static/js/devices.js"></script>
+    {{else if eq .ActivePage "device-detail"}}
+    <script>window.GOVEE_DEVICE_ID = {{.DeviceID}};</script>
+    <script src="/static/js/device-detail.js"></script>
+    {{else if eq .ActivePage "mappings"}}
+    <script src="/static/js/mappings.js"></script>
+    {{else if eq .ActivePage "tokens"}}
+    <script src="/static/js/tokens.js"></script>
+    {{else if eq .ActivePage "activity"}}
+    <script src="/static/js/activity.js"></script>
+    {{else if eq .ActivePage "settings"}}
+    <script src="/static/js/settings.js"></script>
+    {{end}}
+    {{end}}
+</body>
+</html>
+{{end}}

@@ -1,0 +1,43 @@
+{{define "tokens-content"}}
+<div id="tokens-page">
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h1 class="text-2xl font-bold text-white">Webhook Tokens</h1>
+            <p class="text-sm mt-1" style="color: #94a3b8;">Per-caller secrets for the webhook listener — one per GSS / GSSM instance</p>
+        </div>
+        <button onclick="openTokenCreateModal()"
+                class="px-4 py-2 rounded text-sm font-medium transition-colors"
+                style="background: linear-gradient(90deg, #3b82f6, #2563eb); color: white; border: none; cursor: pointer;">
+            + New Token
+        </button>
+    </div>
+
+    <div id="tokens-list" class="max-w-3xl space-y-3"></div>
+
+    <div id="tokens-empty" class="hidden max-w-3xl text-center py-12 device-card">
+        <p style="color: #94a3b8;">No tokens yet. Create one, then point a GSS or GSSM generic webhook at this listener.</p>
+    </div>
+
+    <!-- Create Token Modal -->
+    <div id="token-create-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden items-center justify-center z-50">
+        <div class="bg-slate-800 rounded-lg shadow-xl max-w-md w-full mx-4 p-6" style="border: 1px solid rgba(51, 65, 85, 0.5);">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-bold text-white" id="token-create-modal-title">New Token</h3>
+                <button onclick="closeTokenCreateModal()" class="text-slate-400 hover:text-white transition-colors text-xl">&times;</button>
+            </div>
+            <div id="token-create-modal-content"></div>
+        </div>
+    </div>
+
+    <!-- Confirm Modal -->
+    <div id="token-confirm-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden items-center justify-center z-50">
+        <div class="bg-slate-800 rounded-lg shadow-xl max-w-md w-full mx-4 p-6" style="border: 1px solid rgba(51, 65, 85, 0.5);">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-bold text-white" id="token-confirm-modal-title">Confirm</h3>
+                <button onclick="closeTokenConfirmModal()" class="text-slate-400 hover:text-white transition-colors text-xl">&times;</button>
+            </div>
+            <div id="token-confirm-modal-content"></div>
+        </div>
+    </div>
+</div>
+{{end}}

@@ -1,0 +1,130 @@
+name: Community Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number (e.g., 0.0.1)'
+        required: true
+        type: string
+  push:
+    tags:
+      - 'v*'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # Test job - runs Go tests
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.26'
+          cache: true
+
+      - name: Run tests
+        run: go test -v ./...
+
+      - name: Build binary (test compilation)
+        run: CGO_ENABLED=0 go build -v ./cmd/mmfp-govee
+
+  # Docker build job - builds and pushes multi-arch images
+  build-docker:
+    name: Build and Push Docker Images
+    runs-on: ubuntu-latest
+    needs: test
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Get version info
+        id: version
+        run: |
+          # For workflow_dispatch: use input parameter
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            VERSION="${{ inputs.version }}"
+            echo "source=manual_input" >> $GITHUB_OUTPUT
+          # For tag push: extract from tag
+          elif [[ $GITHUB_REF == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/v}
+            echo "source=git_tag" >> $GITHUB_OUTPUT
+          else
+            VERSION=$(cat VERSION 2>/dev/null || echo "dev")
+            echo "source=version_file" >> $GITHUB_OUTPUT
+          fi
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "build_date=$(date -u +"%Y-%m-%dT%H:%M:%SZ")" >> $GITHUB_OUTPUT
+          echo "commit=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Exclude config files from Docker build
+        run: |
+          echo "" >> .dockerignore
+          echo "# GitHub Actions: Exclude config files from public images" >> .dockerignore
+          echo "config/*.json" >> .dockerignore
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: linux/amd64,linux/arm64
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest
+            type=raw,value=${{ steps.version.outputs.version }}
+          labels: |
+            org.opencontainers.image.title=MMFP Govee
+            org.opencontainers.image.description=MMFP Govee - GSS/GSSM webhook to Govee light effects
+            org.opencontainers.image.vendor=MMFP Solutions
+            org.opencontainers.image.version=${{ steps.version.outputs.version }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            VERSION=${{ steps.version.outputs.version }}
+            BUILD_DATE=${{ steps.version.outputs.build_date }}
+            COMMIT=${{ steps.version.outputs.commit }}
+
+      - name: Build Summary
+        run: |
+          echo "Successfully built and pushed multi-arch Docker images!"
+          echo ""
+          echo "Version: ${{ steps.version.outputs.version }}"
+          echo ""
+          echo "Pull and run:"
+          echo "   docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+          echo "   docker run -d -p 3008:3008 -p 8787:8787 -v ./config:/app/config ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"

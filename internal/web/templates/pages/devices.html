@@ -1,0 +1,41 @@
+{{define "devices-content"}}
+<div id="devices-page">
+    <!-- Loading State -->
+    <div id="devices-loading" class="text-center py-12">
+        <div class="spinner mx-auto mb-4"></div>
+        <p style="color: #94a3b8;">Loading Govee devices...</p>
+    </div>
+
+    <!-- Error State -->
+    <div id="devices-error" class="hidden max-w-2xl mx-auto mb-6 p-4 rounded-lg text-sm"
+         style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171;">
+    </div>
+
+    <!-- Content (width-capped: four compact columns don't need the full container) -->
+    <div id="devices-content-inner" class="hidden max-w-3xl mx-auto">
+        <div class="flex items-center justify-between mb-6">
+            <div>
+                <h1 class="text-2xl font-bold text-white">Govee Devices</h1>
+                <p class="text-sm mt-1" style="color: #94a3b8;">Cached from the Govee API<span id="devices-cached-at"></span></p>
+            </div>
+            <button id="devices-refresh-btn" onclick="refreshDevices()"
+                    class="px-4 py-2 rounded text-sm font-medium transition-colors"
+                    style="background: linear-gradient(90deg, #3b82f6, #2563eb); color: white; border: none; cursor: pointer;">
+                Refresh from Govee
+            </button>
+        </div>
+
+        <div class="list-header list-cols-devices">
+            <div>Status</div>
+            <div>Device Name</div>
+            <div class="devices-col-model">Model</div>
+            <div class="devices-col-id">Device ID</div>
+        </div>
+        <div id="devices-list" class="space-y-1"></div>
+
+        <div id="devices-empty" class="hidden text-center py-12">
+            <p style="color: #94a3b8;">No devices found for this Govee account.</p>
+        </div>
+    </div>
+</div>
+{{end}}

@@ -1,0 +1,19 @@
+{
+    "webServerPort": 3008,
+    "webhookPort": 8787,
+    "title": "MMFP Govee",
+    "goveeApiKey": "paste-your-govee-api-key-here",
+    "disableAuthentication": true,
+    "cookieMaxAge": 3600,
+    "logging": {
+        "level": "info",
+        "logToFile": true
+    },
+    "quietHours": {
+        "enabled": false,
+        "start": "22:00",
+        "end": "07:00"
+    },
+    "tokens": [],
+    "mappings": []
+}

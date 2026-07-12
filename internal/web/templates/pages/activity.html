@@ -1,0 +1,36 @@
+{{define "activity-content"}}
+<div id="activity-page">
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h1 class="text-2xl font-bold text-white">Activity</h1>
+            <p class="text-sm mt-1" style="color: #94a3b8;">Recent webhook hits and effect outcomes — in memory, cleared on restart</p>
+        </div>
+        <button onclick="loadActivity()"
+                class="px-4 py-2 rounded text-sm font-medium transition-colors"
+                style="background: rgba(51, 65, 85, 0.5); color: #e2e8f0; border: 1px solid rgba(71, 85, 105, 0.5); cursor: pointer;">
+            Refresh
+        </button>
+    </div>
+
+    <div class="device-card overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead>
+                <tr style="border-bottom: 1px solid rgba(51, 65, 85, 0.5); color: #94a3b8;">
+                    <th class="text-left py-2 px-3 font-medium">Time</th>
+                    <th class="text-left py-2 px-3 font-medium">Token</th>
+                    <th class="text-left py-2 px-3 font-medium">Source</th>
+                    <th class="text-left py-2 px-3 font-medium">Event</th>
+                    <th class="text-left py-2 px-3 font-medium">Entity</th>
+                    <th class="text-left py-2 px-3 font-medium">Mapping</th>
+                    <th class="text-left py-2 px-3 font-medium">Devices</th>
+                    <th class="text-left py-2 px-3 font-medium">Result</th>
+                </tr>
+            </thead>
+            <tbody id="activity-rows"></tbody>
+        </table>
+        <div id="activity-empty" class="hidden text-center py-12">
+            <p style="color: #94a3b8;">No activity yet. Fire a webhook or use a Test button.</p>
+        </div>
+    </div>
+</div>
+{{end}}

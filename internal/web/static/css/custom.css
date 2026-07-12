@@ -1,0 +1,1131 @@
+/* GSSM Custom Styles */
+
+/* ─── Navigation Tabs ─────────────────────────────────────────── */
+
+.nav-tab {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #94a3b8;
+    transition: all 0.2s ease;
+    text-decoration: none;
+}
+
+.nav-tab:hover {
+    color: #e2e8f0;
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.nav-tab.active {
+    color: #ffffff;
+    background-color: #3b82f6;
+}
+
+.tab-count {
+    margin-left: 0.5rem;
+    font-size: 0.75rem;
+    background: rgba(255, 255, 255, 0.15);
+    padding: 0 0.375rem;
+    border-radius: 9999px;
+    min-width: 1.25rem;
+    text-align: center;
+}
+
+.nav-tab.active .tab-count {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+/* Mobile page selector */
+.coin-selector-mobile {
+    width: 100%;
+    padding: 0.5rem 1rem;
+    background-color: rgba(30, 41, 59, 0.8);
+    border: 1px solid rgba(51, 65, 85, 0.5);
+    border-radius: 0.5rem;
+    color: #e2e8f0;
+    font-size: 0.875rem;
+    cursor: pointer;
+}
+
+.coin-selector-mobile:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+}
+
+.coin-selector-mobile option {
+    background-color: #1e293b;
+    color: #e2e8f0;
+}
+
+/* ─── Stat Card ───────────────────────────────────────────────── */
+
+.stat-card {
+    background-color: white;
+    border-radius: 0.5rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    padding: 1.5rem;
+    transition: all 0.2s;
+}
+
+.stat-card:hover {
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+/* ─── Badge System ────────────────────────────────────────────── */
+
+.badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.125rem 0.625rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+/* custom.css loads after Tailwind, so .badge's display would otherwise override
+   the .hidden utility (equal specificity, later wins) — leaving an empty pill
+   when a badge (e.g. the DUAL badge) is meant to be hidden. This two-class rule
+   wins and makes `hidden` effective on any badge. */
+.badge.hidden {
+    display: none;
+}
+
+/* Device type badges */
+.badge-axeos {
+    background: rgba(251, 146, 60, 0.15);
+    color: #fb923c;
+    border: 1px solid rgba(251, 146, 60, 0.3);
+}
+
+.badge-cgminer {
+    background: rgba(96, 165, 250, 0.15);
+    color: #60a5fa;
+    border: 1px solid rgba(96, 165, 250, 0.3);
+}
+
+.badge-canaan {
+    background: rgba(192, 132, 252, 0.15);
+    color: #c084fc;
+    border: 1px solid rgba(192, 132, 252, 0.3);
+}
+
+.badge-elphapex {
+    background: rgba(52, 211, 153, 0.15);
+    color: #34d399;
+    border: 1px solid rgba(52, 211, 153, 0.3);
+}
+
+.badge-whatsminer {
+    background: rgba(45, 212, 191, 0.15);
+    color: #2dd4bf;
+    border: 1px solid rgba(45, 212, 191, 0.3);
+}
+
+/* Dual-pool mode badge — cyan, informational. Marks NerdQAxe++ devices
+   running in dual-pool mode. Distinct from the device-type and status-color
+   palettes (which already use orange/blue/purple/green/teal). Slightly
+   smaller than the base .badge so it reads as secondary metadata next to
+   the device-type badge, not a peer of it. */
+.badge-dual {
+    background: rgba(34, 211, 238, 0.15);
+    color: #22d3ee;
+    border: 1px solid rgba(34, 211, 238, 0.3);
+    padding: 0.05rem 0.45rem;
+    font-size: 0.65rem;
+}
+
+
+/* ─── Coin Icons ─────────────────────────────────────────────── */
+
+.coin-icon {
+    width: 18px;
+    height: 18px;
+    vertical-align: middle;
+    flex-shrink: 0;
+}
+
+/* ─── Status Dots ─────────────────────────────────────────────── */
+
+.status-online {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background: #22c55e;
+    border-radius: 50%;
+    box-shadow: 0 0 8px rgba(34, 197, 94, 0.5);
+}
+
+.status-offline {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background: #ef4444;
+    border-radius: 50%;
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
+}
+
+.status-error {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background: #fbbf24;
+    border-radius: 50%;
+    box-shadow: 0 0 8px rgba(251, 191, 36, 0.5);
+}
+
+.status-timeout {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background: #94a3b8;
+    border-radius: 50%;
+    box-shadow: 0 0 8px rgba(148, 163, 184, 0.5);
+}
+
+.status-rejected {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background: #a855f7;
+    border-radius: 50%;
+    box-shadow: 0 0 8px rgba(168, 85, 247, 0.5);
+}
+
+.status-disabled {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background: #64748b;
+    border-radius: 50%;
+    /* No glow — disabled is an intentional, quiet state */
+}
+
+/* Disabled miner card: muted appearance to clearly distinguish from
+   offline/error states (which require attention) vs. user-disabled (no action needed). */
+.device-card.device-card-disabled {
+    opacity: 0.55;
+    background: rgba(30, 41, 59, 0.35);
+}
+.device-card.device-card-disabled:hover {
+    opacity: 0.85;
+}
+
+/* ─── Miner/Pool/Node Cards ───────────────────────────────────── */
+
+.device-card {
+    background: rgba(30, 41, 59, 0.6);
+    border: 1px solid rgba(51, 65, 85, 0.5);
+    border-radius: 0.5rem;
+    padding: 1.25rem;
+    transition: all 0.2s;
+}
+
+.device-card:hover {
+    background: rgba(30, 41, 59, 0.75);
+    border-color: rgba(51, 65, 85, 0.8);
+}
+
+.device-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid rgba(51, 65, 85, 0.4);
+    cursor: pointer;
+    user-select: none;
+}
+
+/* iOS/PWA touch reliability for the config-page collapsible section headers
+   (Config, Notifications, Historicals, Health/Metrics). Without this, a tap on
+   a small device was hit-or-miss — iOS would start a text selection on the
+   label or wait out the double-tap-zoom window instead of toggling, so you had
+   to tap twice. Mirrors MIM's .device-card-header fix:
+     - touch-action: manipulation  → opt out of double-tap-zoom disambiguation
+     - tap-highlight transparent    → no gray flash
+     - * { pointer-events: none }   → the tap always lands on the header, never
+                                      a child text/icon node that hijacks it
+   SCOPED to these four toggle classes (not all .device-card-header) on purpose:
+   dashboard card headers legitimately contain links/buttons (see utils.js
+   toggleCardCollapse's `closest('a, button')` guard) that must stay clickable.
+   These config-section headers contain only non-interactive icon/name/arrow
+   spans, so disabling pointer events on their children is safe. */
+.config-section-toggle,
+.notif-section-toggle,
+.hist-section-toggle,
+.metrics-section-toggle {
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+}
+.config-section-toggle *,
+.notif-section-toggle *,
+.hist-section-toggle *,
+.metrics-section-toggle * {
+    pointer-events: none;
+}
+
+/* ─── Card Collapse/Expand ───────────────────────────────────── */
+
+.device-card.collapsed .device-card-body {
+    display: none;
+}
+
+.device-card.collapsed .device-card-header {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+/* Collapsed inline stats — hidden when expanded, shown when collapsed */
+.collapsed-stats {
+    display: none;
+    align-items: center;
+    gap: 0.625rem;
+    margin-left: 0.5rem;
+    font-size: 0.75rem;
+    color: #94a3b8;
+}
+
+
+.device-card.collapsed .collapsed-stats {
+    display: inline-flex;
+}
+
+.collapsed-stat {
+    white-space: nowrap;
+}
+
+.collapsed-stat-value {
+    color: #e2e8f0;
+    font-weight: 500;
+}
+
+/* ─── List View (dense desktop table, alternative to .device-card) ────
+   Two siblings share the column template via .list-cols-{section}:
+   1. .list-header — sits above the grid, renders the column-name row.
+   2. .list-row    — each item; cells are direct children of the grid.
+   Both have display:grid and use the same .list-cols-{section} class so
+   column widths line up vertically. The expanded body inside a row uses
+   grid-column: 1 / -1 to span the full row width. */
+
+.list-header {
+    align-items: center;
+    column-gap: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    color: #64748b;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-bottom: 1px solid rgba(51, 65, 85, 0.5);
+    margin-bottom: 0.25rem;
+}
+/* Tailwind's .hidden (display:none) needs to beat .list-cols-{section}'s
+   display:grid declaration; both are single-class selectors, but custom.css
+   loads after tailwind.css so the grid declaration wins on equal
+   specificity. Two-class selector below pushes specificity higher so
+   .hidden actually hides the header in gallery view. */
+.list-header.hidden,
+.list-row.hidden {
+    display: none;
+}
+.list-header > div {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.list-row {
+    align-items: center;
+    column-gap: 0.75rem;
+    background: rgba(30, 41, 59, 0.6);
+    border: 1px solid rgba(51, 65, 85, 0.5);
+    border-radius: 0.375rem;
+    padding: 0.5rem 0.75rem;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s, border-color 0.15s;
+}
+.list-row:hover {
+    background: rgba(30, 41, 59, 0.85);
+    border-color: rgba(51, 65, 85, 0.8);
+}
+.list-row > div {
+    /* Each cell — single-line, ellipsize on overflow. Action / coin /
+       status cells can opt out by setting overflow on a nested element. */
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.list-row.list-row-disabled {
+    opacity: 0.55;
+    background: rgba(30, 41, 59, 0.35);
+    cursor: default;
+}
+.list-row.list-row-disabled:hover {
+    opacity: 0.85;
+}
+
+/* Expanded body spans all columns of the row's grid. */
+.list-row-body {
+    grid-column: 1 / -1;
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid rgba(51, 65, 85, 0.4);
+    /* Body uses normal layout, NOT the row's grid. */
+    overflow: visible !important;
+    white-space: normal !important;
+    max-width: 64rem;
+}
+
+/* Expand/collapse caret was removed — the entire row is the click target
+   (cursor:pointer on .list-row makes the affordance obvious). */
+
+/* ─── Discover (auto-discovery) page ───
+   Tab strip, result-row grid, and progress bar styles for the /autodiscover
+   page. Tabs follow the simple "underline the active tab" pattern; result
+   rows reuse .list-row for visuals and add their own grid template for the
+   two-column (details + name editor) layout. */
+
+.discover-tab {
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: #94a3b8;
+    cursor: pointer;
+    user-select: none;
+    transition: color 0.15s, border-color 0.15s;
+}
+.discover-tab:hover:not(:disabled) {
+    color: #e2e8f0;
+}
+.discover-tab-active {
+    color: #fb923c;
+    border-bottom-color: #fb923c;
+}
+
+.discover-result-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(220px, 320px);
+    gap: 0.75rem;
+    align-items: center;
+}
+@media (max-width: 640px) {
+    .discover-result-row {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+
+/* ─── Per-dashboard column templates ───
+   Each row dashboard gets its own .list-cols-{section} class applied to
+   BOTH the .list-header and each .list-row, so cells line up across rows. */
+
+/* Layout note: Name is capped at 240px so data columns cluster left after
+   it. The last column for each section is a flex track (1fr) so the row's
+   rightmost data cell hugs the right edge on wide screens. */
+
+/* Miners columns:
+   Status | Block-found | Coin | Name | Hashrate | Diff | Shares | Blocks | Perf | Actions */
+.list-cols-miners {
+    display: grid;
+    grid-template-columns:
+        60px       /* Status pill */
+        24px       /* 🎉 block-found icon (optional) */
+        50px       /* Coin slot — single icon (18px) or dual-pool pair
+                      (two icons ≈ 40px). DUAL badge moved into the body's
+                      Pools section, so this column only carries icons. */
+        minmax(140px, 240px)  /* Name — capped, truncates with tooltip */
+        110px      /* Hashrate (e.g. "5 / 5.5 TH/s") */
+        140px      /* Best diff / session diff */
+        90px       /* Shares accepted/rejected */
+        60px       /* Blocks */
+        60px       /* Perf % */
+        minmax(96px, 1fr); /* Action icons — flex to absorb leftover width */
+}
+
+/* Pools columns:
+   Status | Coin | Name | Net Hash | Net Diff | Block | Miners | Pool Hash | Details+Disable */
+.list-cols-pools {
+    display: grid;
+    grid-template-columns:
+        60px       /* Status pill */
+        32px       /* Coin icon */
+        minmax(140px, 240px)  /* Name */
+        110px      /* Network hashrate */
+        130px      /* Network difficulty */
+        100px      /* Block height */
+        80px       /* Active miners */
+        110px      /* Pool hashrate */
+        minmax(72px, 1fr); /* Action icons (Details + Disable) — flex to absorb leftover width */
+}
+
+/* Nodes columns:
+   Status | Coin | Name | Chain | Blocks | Diff | Verification | Version | Connections | Details+Disable
+   Widths tightened so the full row fits comfortably at 1024px+ viewports
+   (sum ~779-879px including Name's flex range, well inside ~1000px usable). */
+.list-cols-nodes {
+    display: grid;
+    grid-template-columns:
+        60px       /* Status pill */
+        32px       /* Coin icon */
+        minmax(140px, 240px)  /* Name */
+        75px       /* Chain — fits "mainnet" / "testnet" */
+        90px       /* Blocks */
+        110px      /* Difficulty */
+        60px       /* Verification % — fits "100.0%" */
+        110px      /* Version — fits "/Satoshi:27.0.0/" */
+        90px       /* Connections (e.g. "12 (12/0)") */
+        minmax(72px, 1fr); /* Action icons (Details + Disable) — flex to absorb leftover width */
+}
+
+/* Right-align the content in the last (flex) cell of each list-row + header
+   so the action icons / details link / blank header cell pin to the row's
+   right edge instead of floating in the middle of the stretched cell. */
+.list-row > div:last-child,
+.list-header > div:last-child {
+    text-align: right;
+}
+/* Inner flex containers (e.g. the action icon group in renderMinerListRow)
+   need justify-content to right-align their children inside the last cell. */
+.list-row > div:last-child > .flex {
+    justify-content: flex-end;
+}
+
+/* Responsive: at < lg (1024px) the full column templates above are wider
+   than the viewport. Drop the lower-priority columns and slim each row's
+   grid template to match — same pattern config-table-{miners,pools,nodes}
+   uses for its mobile breakpoint above. The .list-cols-{section} class is
+   on BOTH the header element and each row, so .list-cols-{section} > *
+   hides the matching cell in both places at once. */
+@media (max-width: 1023px) {
+    /* Miners — hide Block-found icon (2), Shares (7), Blocks (8). */
+    .list-cols-miners {
+        grid-template-columns:
+            60px 32px
+            minmax(140px, 240px)
+            110px 140px
+            60px
+            minmax(96px, 1fr);
+    }
+    .list-cols-miners > *:nth-child(2),
+    .list-cols-miners > *:nth-child(7),
+    .list-cols-miners > *:nth-child(8) { display: none; }
+
+    /* Pools — hide Net Diff (5), Block (6), Miners (7). */
+    .list-cols-pools {
+        grid-template-columns:
+            60px 32px
+            minmax(140px, 240px)
+            110px 110px
+            minmax(72px, 1fr);
+    }
+    .list-cols-pools > *:nth-child(5),
+    .list-cols-pools > *:nth-child(6),
+    .list-cols-pools > *:nth-child(7) { display: none; }
+
+    /* Nodes — hide Chain (4), Verification (7), Version (8). */
+    .list-cols-nodes {
+        grid-template-columns:
+            60px 32px
+            minmax(140px, 240px)
+            90px 110px
+            90px
+            minmax(72px, 1fr);
+    }
+    .list-cols-nodes > *:nth-child(4),
+    .list-cols-nodes > *:nth-child(7),
+    .list-cols-nodes > *:nth-child(8) { display: none; }
+}
+
+/* ─── Compact summary row (list view) ───
+   In list mode, the summary stat-cards collapse from a 4-column card grid
+   into a denser inline row — same data, less vertical real estate. */
+#summary-cards.stat-row,
+#pools-summary-cards.stat-row,
+#nodes-summary-cards.stat-row {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 0.5rem !important;
+    margin-bottom: 1rem !important;
+}
+#summary-cards.stat-row .stat-card,
+#pools-summary-cards.stat-row .stat-card,
+#nodes-summary-cards.stat-row .stat-card {
+    padding: 0.4rem 0.75rem;
+}
+#summary-cards.stat-row .stat-card h3,
+#pools-summary-cards.stat-row .stat-card h3,
+#nodes-summary-cards.stat-row .stat-card h3 {
+    font-size: 0.7rem;
+    margin-bottom: 0.15rem;
+}
+#summary-cards.stat-row .stat-card p,
+#pools-summary-cards.stat-row .stat-card p,
+#nodes-summary-cards.stat-row .stat-card p {
+    font-size: 1.125rem;
+}
+#summary-cards.stat-row .stat-card > div,
+#pools-summary-cards.stat-row .stat-card > div,
+#nodes-summary-cards.stat-row .stat-card > div {
+    margin-bottom: 0;
+}
+
+/* Hide the expanded-only right section when collapsed */
+.device-card.collapsed .expanded-stats {
+    display: none;
+}
+
+.device-card-name {
+    font-size: 1rem;
+    font-weight: 600;
+    /* Brand gradient text — mirrors .header-title (dark-theme.css) so every card/section
+       title reads with the same signature as the dashboard title. */
+    background: linear-gradient(90deg, #fb923c, #fbbf24);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* Size-less brand gradient for title elements that aren't .device-card-name — list-row names,
+   detail/settings <h1> page titles, and config-table name cells. Same gradient as .header-title. */
+.gradient-text {
+    background: linear-gradient(90deg, #fb923c, #fbbf24);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.device-card-section {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid rgba(51, 65, 85, 0.3);
+}
+
+.device-card-section-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.5rem;
+}
+
+.data-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.25rem 0;
+}
+
+.data-label {
+    font-size: 0.8125rem;
+    color: #94a3b8;
+}
+
+.data-value {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: #e2e8f0;
+}
+
+/* ─── Loading Spinner ─────────────────────────────────────────── */
+
+.spinner {
+    border: 2px solid rgba(51, 65, 85, 0.3);
+    border-top: 2px solid #3b82f6;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    animation: spin 1s linear infinite;
+}
+
+.spinner-sm {
+    display: inline-block;
+    border: 2px solid rgba(251, 191, 36, 0.3);
+    border-top: 2px solid #fbbf24;
+    border-radius: 50%;
+    width: 12px;
+    height: 12px;
+    animation: spin 1s linear infinite;
+    vertical-align: middle;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Status Indicator — used by the header license badge (.status-indicator
+   inside #license-badge). Pulses softly to draw eye but not aggressively.
+   Mirrors the GSS canonical at goslimstratum/internal/web/static/css/custom.css. */
+.status-indicator {
+    display: block;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 9999px;
+    background-color: #22c55e;
+    flex-shrink: 0;
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+/* ─── Animations ──────────────────────────────────────────────── */
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in {
+    animation: fadeIn 0.3s ease-out forwards;
+}
+
+/* ─── Scrollbar ───────────────────────────────────────────────── */
+
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #0f172a;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #334155;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #475569;
+}
+
+html {
+    scroll-behavior: smooth;
+}
+
+/* ─── Temperature Colors ──────────────────────────────────────── */
+
+.temp-cool {
+    color: #22c55e;
+}
+
+.temp-warm {
+    color: #fbbf24;
+}
+
+.temp-hot {
+    color: #ef4444;
+}
+
+/* ─── Chart Container ────────────────────────────────────────── */
+
+.chart-container {
+    position: relative;
+    height: 350px;
+}
+
+/* ─── Settings Form ──────────────────────────────────────────── */
+
+.settings-input {
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(51, 65, 85, 0.5);
+    border-radius: 0.375rem;
+    padding: 0.375rem 0.75rem;
+    color: #e2e8f0;
+    font-size: 0.875rem;
+    width: 14rem;
+    transition: border-color 0.2s;
+}
+
+.settings-input:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+}
+
+.settings-input:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.settings-select {
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(51, 65, 85, 0.5);
+    border-radius: 0.375rem;
+    padding: 0.375rem 0.75rem;
+    color: #e2e8f0;
+    font-size: 0.875rem;
+    width: 14rem;
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+
+.settings-select:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+}
+
+.settings-select option {
+    background: #1e293b;
+    color: #e2e8f0;
+}
+
+/* Widen text/password/select on desktop so long values (stratum URLs,
+   wallet addresses, SV2 pubkeys ~51 chars) don't get chopped. Number
+   inputs are intentionally left at the mobile width — port, frequency,
+   difficulty etc. have short content and look odd over-stretched. */
+@media (min-width: 768px) {
+    .settings-input[type="text"],
+    .settings-input[type="password"],
+    .settings-select {
+        width: 28rem;
+    }
+}
+
+.settings-checkbox {
+    width: 1rem;
+    height: 1rem;
+    accent-color: #3b82f6;
+    cursor: pointer;
+}
+
+/* ─── License Textarea ──────────────────────────────────────────── */
+
+.license-textarea:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+}
+
+.license-textarea::placeholder {
+    color: #64748b;
+}
+
+/* ─── Configuration Page ──────────────────────────────────────── */
+
+.config-table {
+    display: grid;
+    gap: 0;
+    width: 100%;
+}
+
+.config-table-header {
+    display: contents;
+}
+
+.config-table-header > div {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid rgba(51, 65, 85, 0.5);
+}
+
+.config-row {
+    display: contents;
+}
+
+.config-row > div {
+    padding: 0.5rem 0.75rem;
+    display: flex;
+    align-items: center;
+    font-size: 0.875rem;
+    color: #e2e8f0;
+    border-bottom: 1px solid rgba(51, 65, 85, 0.3);
+    min-height: 2.5rem;
+}
+
+.config-row:hover > div {
+    background: rgba(51, 65, 85, 0.2);
+}
+
+.config-row.editing > div {
+    background: rgba(59, 130, 246, 0.05);
+}
+
+.config-row-input {
+    width: 100%;
+    background: rgba(15, 23, 42, 0.8);
+    border: 1px solid rgba(51, 65, 85, 0.5);
+    border-radius: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    color: #e2e8f0;
+    font-size: 0.8125rem;
+}
+
+.config-row-input:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.3);
+}
+
+.config-row-select {
+    width: 100%;
+    background: rgba(15, 23, 42, 0.8);
+    border: 1px solid rgba(51, 65, 85, 0.5);
+    border-radius: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    color: #e2e8f0;
+    font-size: 0.8125rem;
+    cursor: pointer;
+}
+
+.config-row-select:focus {
+    outline: none;
+    border-color: #3b82f6;
+}
+
+.config-row-select option {
+    background: #1e293b;
+    color: #e2e8f0;
+}
+
+.validation-error {
+    border-color: #ef4444 !important;
+    box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.3) !important;
+}
+
+.test-success {
+    color: #22c55e;
+}
+
+.test-failed {
+    color: #ef4444;
+}
+
+/* Each section now has a leading "order" column (drag handle + up/down
+   arrows) — see renderReorderCell in config.js. Widths below include that
+   new first column. */
+/* Each section now has a leading "Order" column. Desktop shows just the
+   drag handle glyph (⋮⋮) — narrow column. Mobile shows the up/down arrows
+   instead (drag doesn't fire on touch) — slightly wider, see media query
+   below. */
+/* Miner table: Order | Name | Address | Port | Addr Type | Device Type | Model | Status | Actions */
+.config-table-miners { grid-template-columns: 50px 1fr 1.5fr 70px 80px 90px 100px 90px 100px; }
+/* Pool table: Order | Type | Name | Host | Coin | GSS Key | Status | Actions */
+.config-table-pools { grid-template-columns: 50px 60px 1fr 1.5fr 90px 90px 90px 100px; }
+/* Node table: Order | Name | Type | RPC Address | Port | Status | Actions */
+.config-table-nodes { grid-template-columns: 50px 1fr 90px 1.2fr 70px 90px 140px; }
+
+/* Reorder cell — leftmost column on each row in a reorderable section.
+   Contains a drag handle (desktop only) + two stacked arrow buttons.
+   draggable="true" lives on the parent .config-row so anywhere in the row
+   can initiate drag; the handle is purely a visual affordance. */
+.config-reorder-cell {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.config-row-drag-handle {
+    cursor: grab;
+    color: #64748b;
+    font-size: 0.875rem;
+    user-select: none;
+    padding: 0 0.15rem;
+    letter-spacing: -2px; /* Pull the two "⋮" glyphs into a visual pair. */
+}
+.config-row-drag-handle:active { cursor: grabbing; }
+
+.config-row.dragging > div { opacity: 0.4; }
+
+/* Drop indicators — a 2px blue inset on the top or bottom edge of the row
+   the cursor is currently hovering over. */
+.config-row.drop-target-above > div { box-shadow: inset 0 2px 0 0 #3b82f6; }
+.config-row.drop-target-below > div { box-shadow: inset 0 -2px 0 0 #3b82f6; }
+
+.config-row-arrows {
+    /* Desktop: hidden — drag works, the ⋮⋮ handle is the affordance.
+       Mobile media query below flips this to inline-flex since HTML5 drag
+       doesn't fire on touch and the arrows become the only reorder path. */
+    display: none;
+    gap: 0.15rem;
+}
+.config-row-arrows button {
+    background: transparent;
+    border: 1px solid rgba(51, 65, 85, 0.5);
+    border-radius: 0.25rem;
+    color: #94a3b8;
+    padding: 0 0.35rem;
+    font-size: 0.625rem;
+    line-height: 1.4;
+    cursor: pointer;
+}
+.config-row-arrows button:hover:not([aria-disabled="true"]) {
+    color: #e2e8f0;
+    border-color: rgba(59, 130, 246, 0.5);
+}
+.config-row-arrows button[aria-disabled="true"] {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+/* Threshold grid: 2 columns of warning/critical pairs */
+.threshold-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+}
+
+.threshold-pair {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.threshold-pair label {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    min-width: 3rem;
+}
+
+.threshold-pair input {
+    width: 5rem;
+}
+
+/* Note: column indices below include the leading "order" column (col 1)
+   added for the drag/arrow reorder feature, so the previously-hidden
+   columns shifted right by one. */
+/* Note: column indices below include the leading "Order" column (col 1)
+   added for the drag/arrow reorder feature, so the previously-hidden
+   columns shifted right by one. */
+@media (max-width: 1024px) {
+    /* Hide Model (now 7th — was 6th before the order column). */
+    .config-table-miners { grid-template-columns: 50px 1fr 1fr 70px 80px 90px 90px 100px; }
+    .config-table-miners .config-table-header > div:nth-child(7),
+    .config-table-miners .config-row > div:nth-child(7) { display: none; }
+    /* Hide GSS Key (col 6 after API Port retired) — Status stays visible.
+       Template drops one slot to match (display:none on a grid child still
+       counts toward track allocation if the template keeps the slot). */
+    .config-table-pools { grid-template-columns: 50px 60px 1fr 1.5fr 90px 90px 100px; }
+    .config-table-pools .config-table-header > div:nth-child(6),
+    .config-table-pools .config-row > div:nth-child(6) { display: none; }
+    .config-table-nodes { grid-template-columns: 50px 1fr 80px 1fr 70px 90px 120px; }
+}
+
+@media (max-width: 768px) {
+    /* Touch breakpoint: HTML5 drag doesn't fire on touch, so hide the drag
+       handle glyph and surface the up/down arrows instead. */
+    .config-row-drag-handle { display: none; }
+    .config-row-arrows { display: inline-flex; }
+    .config-reorder-cell { padding-left: 0.25rem !important; padding-right: 0.25rem !important; }
+
+    /* Long stratum URLs, IP addresses, hostnames, and pool keys cause grid
+       columns to overflow the viewport on phones because `1fr` columns won't
+       shrink below their content's min-content. min-width:0 on cells +
+       minmax(0, 1fr) on the column templates makes them clamp properly.
+       white-space:nowrap + text-overflow:ellipsis truncates with a `…` glyph
+       so each row stays a clean single line — users who need the full value
+       can tap the Edit (✎) icon. */
+    .config-table-miners .config-row > div:not(.config-reorder-cell),
+    .config-table-pools  .config-row > div:not(.config-reorder-cell),
+    .config-table-nodes  .config-row > div:not(.config-reorder-cell) {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    /* Tighter cell padding on mobile so we get every pixel of usable width. */
+    .config-row > div { padding: 0.5rem 0.4rem; }
+
+    /* Action buttons render as icons only on mobile (✎ / ✕ / ✓ via
+       md:hidden in the row renderers), so each button is ~24px and the
+       Actions column can shrink: 2 buttons → 60px, 3 buttons → 84px. */
+
+    /* IP-address-style columns (Miner Address, Pool Host, Node RPC Address)
+       are dropped on mobile entirely. Name carries enough identity on its
+       own at this width, and operators who need the full address tap ✎. */
+
+    /* Miners: Order | Name | Actions. Hide cols 3-8 (Address..Status). */
+    .config-table-miners { grid-template-columns: 50px minmax(0, 1fr) 60px; }
+    .config-table-miners .config-table-header > div:nth-child(n+3):nth-child(-n+8),
+    .config-table-miners .config-row > div:nth-child(n+3):nth-child(-n+8) { display: none; }
+    /* Pools: Order | Type | Name | Actions. Type column is 56px — the badge
+       itself is ~35px wide ("GSS"/"LTC" at text-xs with px-1.5 padding +
+       border), plus 0.4rem cell padding on each side, plus a few px of
+       breathing room so the rounded chip doesn't visually touch the column
+       edges. Hide cols 4-7 (Host..Status — was 4-8 before API Port retired). */
+    .config-table-pools { grid-template-columns: 50px 56px minmax(0, 1fr) 60px; }
+    .config-table-pools .config-table-header > div:nth-child(n+4):nth-child(-n+7),
+    .config-table-pools .config-row > div:nth-child(n+4):nth-child(-n+7) { display: none; }
+    /* Nodes: Order | Name | Actions (3 icons: Test/Edit/Del). Hide cols 3-6
+       (Type, RPC Address, Port, Status — was 3-7 before RPC User retired). */
+    .config-table-nodes { grid-template-columns: 50px minmax(0, 1fr) 84px; }
+    .config-table-nodes .config-table-header > div:nth-child(n+3):nth-child(-n+6),
+    .config-table-nodes .config-row > div:nth-child(n+3):nth-child(-n+6) { display: none; }
+    .threshold-grid { grid-template-columns: 1fr; }
+}
+
+/* ─── Log Terminal ───────────────────────────────────────────── */
+
+.log-line {
+    padding: 1px 0;
+    white-space: pre-wrap;
+    word-break: break-all;
+    line-height: 1.4;
+}
+
+.log-line.system-message {
+    color: #60a5fa;
+    font-style: italic;
+}
+
+/* ─── Help Page ──────────────────────────────────────────────────── */
+
+.help-callout {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.25rem;
+    height: 1.25rem;
+    border-radius: 50%;
+    background: rgba(59, 130, 246, 0.2);
+    color: #60a5fa;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    border: 1px solid rgba(59, 130, 246, 0.4);
+    flex-shrink: 0;
+}
+
+/* ── MMFP Govee: Devices list view ─────────────────────────────
+   Columns: Status (power icon) | Device Name (→ controller) | Model | Device ID
+   Same .list-header/.list-row grid pairing as the GSSM canonical. */
+.list-cols-devices {
+    display: grid;
+    grid-template-columns:
+        70px                  /* Status (clickable power icon) */
+        minmax(140px, 1fr)    /* Device Name (links to the controller) */
+        70px                  /* Model */
+        minmax(150px, 220px); /* Device ID */
+}
+
+@media (max-width: 768px) {
+    /* Narrow screens: drop Model + Device ID */
+    .list-cols-devices {
+        grid-template-columns:
+            60px
+            minmax(100px, 1fr);
+    }
+    .list-cols-devices .devices-col-model,
+    .list-cols-devices .devices-col-id {
+        display: none;
+    }
+}

@@ -40,6 +40,14 @@ type SceneApplier interface {
 	ApplyScene(ctx context.Context, sku, device, instance string, value json.RawMessage) error
 }
 
+// TransportReporter is the optional Controller extension that names which
+// path serves a device (govee.Client implements it). This is OBSERVABILITY
+// ONLY — the engine labels Activity rows with it and never branches on it, so
+// the transport-blind design holds: effects behave identically either way.
+type TransportReporter interface {
+	TransportFor(device string) string
+}
+
 // Verifier is the optional Controller extension for post-effect verification
 // (govee.Client implements it). LAN writes are fire-and-forget UDP with no
 // ack, so "sent" proves nothing: after an effect we ask the transport to
@@ -52,8 +60,9 @@ type Verifier interface {
 // The interface assertions happen at runtime (Controller is the declared
 // dependency); these guards make any govee.Client drift a compile error.
 var (
-	_ SceneApplier = (*govee.Client)(nil)
-	_ Verifier     = (*govee.Client)(nil)
+	_ SceneApplier      = (*govee.Client)(nil)
+	_ Verifier          = (*govee.Client)(nil)
+	_ TransportReporter = (*govee.Client)(nil)
 )
 
 // SceneRef names a scene to apply (from the device's scene catalog).
@@ -212,12 +221,13 @@ func (e *Engine) EnqueueControl(dev Device, capType, instance string, value inte
 		ctx, cancel := context.WithTimeout(e.ctx, perDeviceTimeout)
 		defer cancel()
 
+		transport := e.transportFor(dev.Device)
 		if err := e.controller.Control(ctx, dev.SKU, dev.Device, capType, instance, value); err != nil {
 			e.log.Error("Manual control %s/%s on %s failed: %v", capType, instance, dev.Device, err)
-			e.record(job, dev.Device, "effect failed: "+err.Error())
+			e.recordVia(job, dev.Device, "effect failed: "+err.Error(), transport)
 			return
 		}
-		e.record(job, dev.Device, "effect ok")
+		e.recordVia(job, dev.Device, "effect ok", transport)
 	}()
 }
 
@@ -225,6 +235,12 @@ func (e *Engine) EnqueueControl(dev Device, capType, instance string, value inte
 // one device (per-device outcomes); "" means job-level, which carries the
 // job's full device list.
 func (e *Engine) record(job Job, device, result string) {
+	e.recordVia(job, device, result, "")
+}
+
+// recordVia is record() plus the transport that served the device. transport
+// must be sampled BEFORE the work runs (see transportFor).
+func (e *Engine) recordVia(job Job, device, result, transport string) {
 	if e.act == nil {
 		return
 	}
@@ -244,8 +260,20 @@ func (e *Engine) record(job Job, device, result string) {
 		MappingID:   job.MappingID,
 		MappingName: job.MappingName,
 		Devices:     devices,
+		Transport:   transport,
 		Result:      result,
 	})
+}
+
+// transportFor names the path serving a device, for Activity labelling. Must
+// be called BEFORE the work: a failed LAN read-back drops the route, so a
+// later call would report "cloud" for an effect attempted over LAN — exactly
+// backwards on the failures worth investigating.
+func (e *Engine) transportFor(device string) string {
+	if r, ok := e.controller.(TransportReporter); ok {
+		return r.TransportFor(device)
+	}
+	return ""
 }
 
 func (e *Engine) inQuietHours() bool {
@@ -303,10 +331,15 @@ func (e *Engine) runOnDevice(job Job, dev Device) {
 	ctx, cancel := context.WithTimeout(e.ctx, perDeviceTimeout)
 	defer cancel()
 
+	// Sample the transport up front: verification can drop a stale LAN route,
+	// and a row saying "cloud" for an effect that went out over LAN would be
+	// a lie precisely where the truth matters.
+	transport := e.transportFor(dev.Device)
+
 	err := e.execute(ctx, job, dev)
 	if err != nil {
 		e.log.Error("Effect %s on %s/%s failed: %v", job.Effect, dev.SKU, dev.Device, err)
-		e.record(job, dev.Device, "effect failed: "+err.Error())
+		e.recordVia(job, dev.Device, "effect failed: "+err.Error(), transport)
 		return
 	}
 	if err := e.verify(ctx, dev); err != nil {
@@ -314,10 +347,10 @@ func (e *Engine) runOnDevice(job Job, dev Device) {
 		// rather than reporting a hopeful "ok". The transport has already
 		// dropped the stale route and re-scanned; the next event uses cloud.
 		e.log.Error("Effect %s on %s/%s sent but unverified: %v", job.Effect, dev.SKU, dev.Device, err)
-		e.record(job, dev.Device, "effect failed: device did not respond")
+		e.recordVia(job, dev.Device, "effect failed: device did not respond", transport)
 		return
 	}
-	e.record(job, dev.Device, "effect ok")
+	e.recordVia(job, dev.Device, "effect ok", transport)
 }
 
 func (e *Engine) execute(ctx context.Context, job Job, dev Device) error {

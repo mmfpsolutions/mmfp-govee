@@ -28,6 +28,23 @@ document.addEventListener('DOMContentLoaded', function() {
     }, 15000);
 });
 
+// Which path served the device: LAN (green) or cloud (gray). Blank on rows
+// where nothing was sent (queued / cooldown / quiet hours / no match) or that
+// span multiple devices.
+function transportBadge(t) {
+    if (t === 'lan') {
+        return '<span class="text-xs px-1.5 py-0.5 rounded font-medium" ' +
+            'style="background: rgba(34, 197, 94, 0.15); color: #4ade80;" ' +
+            'title="Served directly over your LAN — fast, no API budget">LAN</span>';
+    }
+    if (t === 'cloud') {
+        return '<span class="text-xs px-1.5 py-0.5 rounded" ' +
+            'style="background: rgba(100, 116, 139, 0.2); color: #94a3b8;" ' +
+            'title="Served by the Govee cloud API">cloud</span>';
+    }
+    return '<span class="text-xs" style="color: #475569;">&mdash;</span>';
+}
+
 function deviceNames(ids) {
     if (!ids || !ids.length) return '';
     return ids.map(function(id) {
@@ -64,6 +81,7 @@ function loadActivity() {
                 '<td class="py-2 px-3" style="color: #94a3b8;">' + escapeHtml(r.entity || '') + '</td>' +
                 '<td class="py-2 px-3" style="color: #e2e8f0;">' + escapeHtml(r.mappingName || '') + '</td>' +
                 '<td class="py-2 px-3" style="color: #94a3b8;">' + deviceNames(r.devices) + '</td>' +
+                '<td class="py-2 px-3">' + transportBadge(r.transport) + '</td>' +
                 '<td class="py-2 px-3" style="color: ' + resultColor(r.result) + ';">' + escapeHtml(r.result) + '</td>' +
             '</tr>';
         }).join('');

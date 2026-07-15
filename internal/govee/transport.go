@@ -126,6 +126,24 @@ func toInt(v interface{}) (int, bool) {
 	return 0, false
 }
 
+// Transport names, for observability (Activity rows). These label what
+// happened; nothing branches on them.
+const (
+	TransportLAN   = "lan"
+	TransportCloud = "cloud"
+)
+
+// TransportFor reports which path currently serves a device. Callers must
+// sample this BEFORE acting: a failed LAN read-back drops the route, so asking
+// afterwards would report "cloud" for work that was actually attempted over
+// LAN — mislabelling exactly the failures worth investigating.
+func (c *Client) TransportFor(device string) string {
+	if _, ok := c.lanRouteFor(device); ok {
+		return TransportLAN
+	}
+	return TransportCloud
+}
+
 // VerifyReachable confirms a device answered on the transport that just
 // served it. The engine calls this after an effect (optional Verifier
 // interface) so Activity can report the truth instead of merely "sent".

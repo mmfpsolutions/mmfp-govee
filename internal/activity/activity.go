@@ -29,7 +29,11 @@ type Record struct {
 	MappingID   string    `json:"mappingId,omitempty"`
 	MappingName string    `json:"mappingName,omitempty"`
 	Devices     []string  `json:"devices,omitempty"` // Govee device IDs involved (UI resolves names)
-	Result      string    `json:"result"`            // "queued", "no match", "cooldown", "quiet hours", "rejected", "effect ok", "effect failed: ..."
+	// Transport is which path served this device: "lan" or "cloud". Empty on
+	// job-level rows (a job's devices can differ) and on rows where nothing was
+	// sent (queued / cooldown / quiet hours / rejected / no match).
+	Transport string `json:"transport,omitempty"`
+	Result    string `json:"result"` // "queued", "no match", "cooldown", "quiet hours", "rejected", "effect ok", "effect failed: ..."
 }
 
 // Log is a fixed-size thread-safe ring buffer.

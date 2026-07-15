@@ -341,6 +341,92 @@ func TestEngine_VerifiedEffectReportsOK(t *testing.T) {
 	})
 }
 
+// transportFake reports a transport that CHANGES mid-effect, mimicking a LAN
+// route being dropped by a failed read-back.
+type transportFake struct {
+	fakeController
+	mu        sync.Mutex
+	transport string
+	verifyErr error
+	verified  chan string
+}
+
+func (v *transportFake) TransportFor(string) string {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	return v.transport
+}
+
+func (v *transportFake) VerifyReachable(_ context.Context, _, device string) error {
+	if v.verifyErr != nil {
+		// A real client drops the stale route here, so TransportFor would
+		// answer "cloud" from now on.
+		v.mu.Lock()
+		v.transport = "cloud"
+		v.mu.Unlock()
+	}
+	select {
+	case v.verified <- device:
+	default:
+	}
+	return v.verifyErr
+}
+
+func transportOf(t *testing.T, act *activity.Log, mappingID string) string {
+	t.Helper()
+	for _, r := range act.Recent(0) {
+		if r.MappingID == mappingID && r.Result != "queued" {
+			return r.Transport
+		}
+	}
+	return ""
+}
+
+// A LAN-served effect is labelled "lan" in Activity.
+func TestEngine_ActivityRecordsTransport(t *testing.T) {
+	fake := &transportFake{
+		fakeController: *newFakeController(),
+		transport:      "lan",
+		verified:       make(chan string, 1),
+	}
+	act := activity.GetLog()
+	e := NewEngine(fake, act)
+	defer e.Stop()
+
+	e.Enqueue(testJob("m-lan", "dev-t1"), 0)
+	waitFor(t, func() bool { return transportOf(t, act, "m-lan") != "" })
+	if got := transportOf(t, act, "m-lan"); got != "lan" {
+		t.Errorf("transport = %q, want lan", got)
+	}
+}
+
+// Regression: verification drops a stale LAN route, so sampling the transport
+// AFTER the effect would label a LAN failure as "cloud" — backwards, and on
+// exactly the row worth investigating. It must be sampled up front.
+func TestEngine_FailedLANEffectStillLabelledLAN(t *testing.T) {
+	fake := &transportFake{
+		fakeController: *newFakeController(),
+		transport:      "lan",
+		verifyErr:      errors.New("no devStatus reply"),
+		verified:       make(chan string, 1),
+	}
+	act := activity.GetLog()
+	e := NewEngine(fake, act)
+	defer e.Stop()
+
+	e.Enqueue(testJob("m-lanfail", "dev-t2"), 0)
+	select {
+	case <-fake.verified:
+	case <-time.After(5 * time.Second):
+		t.Fatal("verification never ran")
+	}
+	waitFor(t, func() bool { return transportOf(t, act, "m-lanfail") != "" })
+
+	if got := transportOf(t, act, "m-lanfail"); got != "lan" {
+		t.Errorf("transport = %q, want lan — the effect went out over LAN even though the route died during verification", got)
+	}
+}
+
 // Manual controls take the device lock (no interleave with effects) but skip
 // quiet hours — the operator is explicitly acting.
 func TestEngine_ControlSerializedAndQuietHoursExempt(t *testing.T) {

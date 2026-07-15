@@ -48,6 +48,23 @@ type QuietHoursConfig struct {
 // automatically when nothing answers, so it is safe to leave on anywhere.
 type LANConfig struct {
 	Enabled *bool `json:"enabled,omitempty"` // default TRUE
+	// Devices are STATIC routes for environments where multicast discovery
+	// cannot run — notably Docker Desktop for Mac, where `--network host` is a
+	// no-op and the scan finds nothing, but unicast to a known IP works fine
+	// (bridge networking + a published 4002/udp port). Discovery and transport
+	// fail independently; this covers the gap.
+	//
+	// Leave empty on Linux hosts: discovery does the job and proves the device
+	// is actually LAN-enabled and answering, which a static entry cannot.
+	// Pair with DHCP reservations — a drifting IP silently points at nothing.
+	Devices []LANDevice `json:"devices,omitempty"`
+}
+
+// LANDevice is one statically configured LAN route.
+type LANDevice struct {
+	Device string `json:"device"` // Govee device ID (same value the cloud API uses)
+	SKU    string `json:"sku"`
+	IP     string `json:"ip"`
 }
 
 // Token is a per-caller webhook secret. The token value is encrypted at rest
@@ -142,6 +159,14 @@ func (c *Config) LANEnabled() bool {
 		return true
 	}
 	return *c.LAN.Enabled
+}
+
+// LANStaticDevices returns the configured static routes (nil when unset).
+func (c *Config) LANStaticDevices() []LANDevice {
+	if c.LAN == nil {
+		return nil
+	}
+	return c.LAN.Devices
 }
 
 // AuthDisabled reports whether the web UI auth gate is off. Auth is opt-in:

@@ -212,3 +212,59 @@ func TestToInt(t *testing.T) {
 		}
 	}
 }
+
+// Static routes cover environments where discovery cannot run (Docker Desktop
+// for Mac): multicast is dead there but unicast to a known IP works.
+func TestLAN_StaticRoutesSeeded(t *testing.T) {
+	s := newTestLANService(t)
+	s.SetStaticRoutes([]StaticRoute{
+		{Device: "34:FD:CC:44:A9:3A:60:AC", SKU: "H607C", IP: "192.168.7.75"},
+		{Device: "", IP: "1.2.3.4"},          // ignored: no device id
+		{Device: "no-ip", SKU: "H1", IP: ""}, // ignored: no IP
+	})
+	s.seedStatics()
+
+	r, ok := s.Route("34:FD:CC:44:A9:3A:60:AC")
+	if !ok {
+		t.Fatal("static route was not seeded")
+	}
+	if r.IP != "192.168.7.75" || !r.Static {
+		t.Errorf("route = %+v, want IP 192.168.7.75 and Static=true", r)
+	}
+	if len(s.Routes()) != 1 {
+		t.Errorf("routes = %d, want 1 (malformed entries must be skipped)", len(s.Routes()))
+	}
+}
+
+// A live discovery beats a config guess: the observed IP wins so a stale
+// static entry cannot pin the app to a dead address.
+func TestLAN_DiscoveryOverridesStatic(t *testing.T) {
+	s := newTestLANService(t)
+	s.mu.Lock()
+	s.routes["dev-x"] = LANRoute{IP: "192.168.7.99", SKU: "H607C"} // discovered
+	s.mu.Unlock()
+
+	s.SetStaticRoutes([]StaticRoute{{Device: "dev-x", SKU: "H607C", IP: "10.0.0.1"}})
+	s.seedStatics()
+
+	r, _ := s.Route("dev-x")
+	if r.IP != "192.168.7.99" || r.Static {
+		t.Errorf("route = %+v, want the discovered 192.168.7.99 to win", r)
+	}
+}
+
+// Self-heal must NOT re-arm a dead static route: otherwise every effect pays a
+// read-back timeout forever. Only startup and manual re-scan re-seed.
+func TestLAN_DropRouteDoesNotReseedStatics(t *testing.T) {
+	s := newTestLANService(t)
+	s.SetStaticRoutes([]StaticRoute{{Device: "dev-static", SKU: "H1", IP: "192.168.1.9"}})
+	s.seedStatics()
+	if _, ok := s.Route("dev-static"); !ok {
+		t.Fatal("precondition: static route should be seeded")
+	}
+
+	s.dropRoute("dev-static") // stale → also triggers a self-heal Scan()
+	if _, ok := s.Route("dev-static"); ok {
+		t.Error("dead static route was re-armed by the self-heal scan — it must stay on cloud until a manual re-scan")
+	}
+}

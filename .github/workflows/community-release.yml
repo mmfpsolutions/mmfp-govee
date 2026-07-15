@@ -36,7 +36,7 @@ jobs:
       - name: Build binary (test compilation)
         run: CGO_ENABLED=0 go build -v ./cmd/mmfp-govee
 
-  # Docker build job - builds and pushes multi-arch images
+  # Docker build job - builds and pushes the image (amd64 only for now; see below)
   build-docker:
     name: Build and Push Docker Images
     runs-on: ubuntu-latest
@@ -75,10 +75,14 @@ jobs:
           echo "# GitHub Actions: Exclude config files from public images" >> .dockerignore
           echo "config/*.json" >> .dockerignore
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: linux/amd64,linux/arm64
+      # TEMPORARY: amd64-only builds (Scott runs amd64; arm64 emulation is slow).
+      # Restore both this step and the platforms list below before going public.
+      # QEMU is ONLY needed to emulate a foreign arch — amd64 builds on an amd64
+      # runner natively, so this step is pure overhead while arm64 is off.
+      # - name: Set up QEMU
+      #   uses: docker/setup-qemu-action@v3
+      #   with:
+      #     platforms: linux/amd64,linux/arm64
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -108,7 +112,9 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          platforms: linux/amd64,linux/arm64
+          # TEMPORARY: amd64 only — restore `linux/amd64,linux/arm64` (and the
+          # QEMU step above) before publishing.
+          platforms: linux/amd64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -121,7 +127,7 @@ jobs:
 
       - name: Build Summary
         run: |
-          echo "Successfully built and pushed multi-arch Docker images!"
+          echo "Successfully built and pushed Docker image (linux/amd64)!"
           echo ""
           echo "Version: ${{ steps.version.outputs.version }}"
           echo ""

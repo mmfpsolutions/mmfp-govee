@@ -121,7 +121,11 @@ func run() error {
 	// A bind failure or an empty scan is non-fatal: every device falls back to
 	// the cloud API per-device, so this is safe on any network.
 	if cfg.LANEnabled() {
-		client.EnableLAN()
+		var statics []govee.StaticRoute
+		for _, d := range cfg.LANStaticDevices() {
+			statics = append(statics, govee.StaticRoute{Device: d.Device, SKU: d.SKU, IP: d.IP})
+		}
+		client.EnableLAN(statics)
 	} else {
 		log.Info("LAN control disabled by config — using the cloud API only")
 	}

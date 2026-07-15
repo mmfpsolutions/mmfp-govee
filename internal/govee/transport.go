@@ -26,15 +26,18 @@ import (
 	"time"
 )
 
-// EnableLAN starts LAN discovery. A bind failure is non-fatal: it is logged
-// and the client stays cloud-only. Safe to call once at startup.
-func (c *Client) EnableLAN() {
+// EnableLAN starts LAN discovery, optionally seeded with static routes for
+// environments where multicast cannot run (Docker Desktop for Mac). A bind
+// failure is non-fatal: it is logged and the client stays cloud-only. Safe to
+// call once at startup.
+func (c *Client) EnableLAN(statics []StaticRoute) {
 	svc, err := newLANService(c.log)
 	if err != nil {
 		c.log.Warn("LAN control unavailable (%v) — continuing with the cloud API only", err)
 		return
 	}
 	c.lan = svc
+	c.lan.SetStaticRoutes(statics)
 	c.lan.Start()
 	c.log.Info("LAN control enabled — scanning for devices")
 }

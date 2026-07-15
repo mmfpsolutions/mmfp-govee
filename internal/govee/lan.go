@@ -58,11 +58,23 @@ const (
 // packets total.
 var lanStartupRetries = []time.Duration{time.Minute, 5 * time.Minute, 15 * time.Minute}
 
-// LANRoute is a discovered LAN-reachable device.
+// LANRoute is a LAN-reachable device — discovered by scan, or configured
+// statically where discovery cannot run (see StaticRoute).
 type LANRoute struct {
 	IP       string    `json:"ip"`
 	SKU      string    `json:"sku"`
 	LastSeen time.Time `json:"lastSeen"`
+	Static   bool      `json:"static,omitempty"` // from config, not discovery
+}
+
+// StaticRoute is a configured device→IP mapping for environments where
+// multicast discovery cannot run (Docker Desktop for Mac). Discovery and
+// transport fail independently: the scan may find nothing while unicast to a
+// known IP works perfectly.
+type StaticRoute struct {
+	Device string
+	SKU    string
+	IP     string
 }
 
 // lanEnvelope is the wire frame for every LAN message.
@@ -101,6 +113,11 @@ type lanService struct {
 	// device on an ephemeral port.
 	controlPort int
 
+	// statics are re-seeded on startup and manual re-scan ONLY — never on the
+	// self-heal scan, so a dead static device drops to cloud and stays there
+	// instead of re-arming and costing a read-back timeout on every effect.
+	statics []StaticRoute
+
 	mu       sync.RWMutex
 	routes   map[string]LANRoute // device ID → route
 	lastScan time.Time
@@ -136,8 +153,36 @@ func newLANService(log *logger.Logger) (*lanService, error) {
 	return s, nil
 }
 
-// Start runs the startup scan plus the bounded retry schedule.
+// SetStaticRoutes installs configured routes (applied on the next seed).
+func (s *lanService) SetStaticRoutes(routes []StaticRoute) {
+	s.statics = routes
+}
+
+// seedStatics installs configured routes. Discovery wins: a scan reply for
+// the same device overwrites the static entry with the observed IP.
+func (s *lanService) seedStatics() {
+	if len(s.statics) == 0 {
+		return
+	}
+	s.mu.Lock()
+	for _, r := range s.statics {
+		if r.Device == "" || r.IP == "" {
+			continue
+		}
+		if _, discovered := s.routes[r.Device]; discovered {
+			continue // a live discovery beats a config guess
+		}
+		s.routes[r.Device] = LANRoute{IP: r.IP, SKU: r.SKU, LastSeen: time.Now(), Static: true}
+	}
+	n := len(s.routes)
+	s.mu.Unlock()
+	s.log.Info("Seeded %d static LAN route(s); %d route(s) total", len(s.statics), n)
+}
+
+// Start seeds static routes, then runs the startup scan plus the bounded
+// retry schedule.
 func (s *lanService) Start() {
+	s.seedStatics()
 	s.Scan()
 	s.wg.Add(1)
 	go func() {
@@ -191,6 +236,9 @@ func (s *lanService) ScanAndWait(ctx context.Context) {
 	case <-ctx.Done():
 	case <-time.After(lanScanWindow):
 	}
+	// Manual re-scan re-arms static routes too — this is the operator's
+	// explicit "try again", including for a device that had gone stale.
+	s.seedStatics()
 }
 
 // receiveLoop demuxes everything arriving on :4002 — scan replies (which

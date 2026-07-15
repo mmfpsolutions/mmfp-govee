@@ -1,28 +1,55 @@
 services:
+  # ── Linux host (production) ────────────────────────────────────────────
+  # Host networking is REQUIRED for Govee LAN Control discovery: the scan is
+  # UDP multicast (239.255.255.250:4001) and replies arrive on :4002 — neither
+  # survives a bridge network.
+  #
+  # With host networking there is no port mapping: the app binds the host
+  # directly on webServerPort (3008) and webhookPort (8787) from config.json.
+  #
+  # This service does NOT work on Docker Desktop for Mac/Windows: containers
+  # run in a Linux VM there, so host mode shares the VM's stack, not the host's,
+  # and discovery finds nothing. Use the mmfp-govee-mac service below instead.
   mmfp-govee:
     image: ghcr.io/mmfpsolutions/mmfp-govee:latest
     container_name: mmfp-govee
     restart: unless-stopped
-    # Host networking is REQUIRED for Govee LAN Control (optional feature).
-    # The LAN protocol discovers devices via UDP multicast (239.255.255.250:4001)
-    # and receives replies on :4002 — neither survives a bridge network.
-    #
-    # With host networking there is no port mapping: the app binds the host
-    # directly on webServerPort (3008) and webhookPort (8787) from config.json.
-    #
-    # NOTE: this only works on Linux. Docker Desktop for Mac/Windows runs
-    # containers in a VM, so host mode shares the VM's stack, not the host's —
-    # LAN discovery finds nothing there and every device falls back to the
-    # cloud API automatically. That is a supported (if slower) configuration:
-    # LAN is a bonus, never a requirement.
     network_mode: host
     volumes:
       - ./config:/app/config
       - ./logs:/app/logs
     environment:
       - TZ=America/New_York
-    # If you do NOT use Govee LAN Control, you can drop network_mode: host and
-    # publish ports the normal way instead:
-    # ports:
-    #   - "3008:3008"   # web app
-    #   - "8787:8787"   # webhook listener (GSS / GSSM point here)
+
+  # ── Docker Desktop for Mac / Windows (development) ─────────────────────
+  # Multicast discovery cannot work here, but UNICAST to a known IP does — so
+  # LAN Control still works if you tell it where the devices are:
+  #
+  #   1. Give each Govee device a DHCP reservation on your router.
+  #   2. List them in config.json (device IDs come from the Devices page):
+  #        "lan": { "enabled": true, "devices": [
+  #          { "device": "34:FD:CC:44:A9:3A:60:AC", "sku": "H607C", "ip": "192.168.7.75" }
+  #        ]}
+  #   3. Start THIS service by name:  docker compose up -d mmfp-govee-mac
+  #
+  #      Target it explicitly (compose auto-enables its profile). Do NOT use
+  #      `--profile mac up` — that also starts the host-mode mmfp-govee service
+  #      above and the two collide on ports 3008/8787.
+  #
+  # Publishing 4002/udp is the load-bearing part: Govee devices reply to port
+  # 4002 rather than the sender's source port, so the reply is unsolicited
+  # inbound traffic — which is exactly what a published port forwards.
+  mmfp-govee-mac:
+    profiles: ["mac"]
+    image: ghcr.io/mmfpsolutions/mmfp-govee:latest
+    container_name: mmfp-govee-mac
+    restart: unless-stopped
+    ports:
+      - "3008:3008"       # web app
+      - "8787:8787"       # webhook listener (GSS / GSSM point here)
+      - "4002:4002/udp"   # Govee LAN replies (devStatus) — required for LAN Control
+    volumes:
+      - ./config:/app/config
+      - ./logs:/app/logs
+    environment:
+      - TZ=America/New_York

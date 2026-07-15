@@ -81,6 +81,49 @@ ports require a restart. Secrets (`goveeApiKey`, token secrets) are encrypted at
 
 **Quiet hours:** suppress effects inside a local-time window (webhooks are still logged).
 
+## LAN Control (optional, faster)
+
+Govee devices with **LAN Control** enabled in the Govee Home app can be driven directly over your
+network instead of the cloud API — roughly 10× faster, no API budget, and they keep working with the
+internet down. It's per-device and automatic: anything without it falls back to the cloud, so you
+can adopt it one lamp at a time. The **LAN Control** column on the Devices page shows a green check
+for devices currently served over LAN.
+
+Scenes always use the cloud API (the LAN protocol has no scene command), so an effect that ends on a
+scene still costs one cloud call — versus a dozen for the flash itself.
+
+Defaults are on; the block is optional:
+
+```json
+"lan": { "enabled": true }
+```
+
+**Linux hosts** need nothing else, but LAN discovery is UDP multicast, so the container must share
+the host's network — `network_mode: host` (already set in `docker-compose.yml`). Leave `devices`
+empty: discovery finds everything and proves each device is really answering.
+
+**Docker Desktop for Mac / Windows** can't do multicast discovery (containers run in a VM, so host
+mode shares the VM's network, not yours) — but unicast to a known IP works fine. Give each device a
+**DHCP reservation**, list them, and use the Mac service:
+
+```json
+"lan": {
+    "enabled": true,
+    "devices": [
+        { "device": "34:FD:CC:44:A9:3A:60:AC", "sku": "H607C", "ip": "192.168.7.75" }
+    ]
+}
+```
+
+```bash
+docker compose up -d mmfp-govee-mac    # bridge networking + publishes 4002/udp
+```
+
+Device IDs and models come from the Devices page. Only list devices with reserved IPs — a static
+entry pointing at a drifted address silently does nothing (the app notices and falls back to cloud,
+but you lose the speed-up without an obvious reason). Static entries are ignored wherever discovery
+finds the device anyway, so they're harmless to leave in a shared config.
+
 ## Build
 
 ```bash

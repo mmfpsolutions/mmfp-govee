@@ -52,6 +52,15 @@ function ddRenderHeader() {
     document.getElementById('dd-sku').textContent = dd.info.sku;
     document.getElementById('dd-id').textContent = dd.info.device;
 
+    // LAN badge — this device is driven over UDP (fast, free, works offline).
+    // Absent = served by the Govee cloud API.
+    var lan = document.getElementById('dd-lan');
+    if (dd.info.lanControl) {
+        lan.textContent = 'LAN' + (dd.info.lanIP ? ' \u00b7 ' + dd.info.lanIP : '');
+        lan.title = 'Power, brightness and color go direct over your LAN. Scenes always use the cloud API.';
+        lan.classList.remove('hidden');
+    }
+
     var sel = document.getElementById('dd-assigned-scene');
     sel.innerHTML = dd.assignedScene
         ? '<option value="" selected>' + escapeHtml(dd.assignedScene.name) + '</option>'

@@ -116,6 +116,16 @@ func run() error {
 		return security.DecryptIfEncrypted(cfgManager.GetConfig().GoveeAPIKey)
 	}, "")
 
+	// LAN Control fast path (optional; defaults on). Discovery is startup +
+	// bounded retries + manual Refresh + self-heal — never a polling timer.
+	// A bind failure or an empty scan is non-fatal: every device falls back to
+	// the cloud API per-device, so this is safe on any network.
+	if cfg.LANEnabled() {
+		client.EnableLAN()
+	} else {
+		log.Info("LAN control disabled by config — using the cloud API only")
+	}
+
 	// Activity log + effects engine
 	act := activity.GetLog()
 	engine := effects.NewEngine(client, act)
@@ -165,9 +175,11 @@ func run() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	// Stop accepting webhooks first, then let in-flight effects finish.
+	// Stop accepting webhooks first, then let in-flight effects finish, then
+	// close the LAN socket (effects may still be using it).
 	hookServer.Stop(ctx)
 	engine.Stop()
+	client.StopLAN()
 
 	logger.StopRotation()
 	defer logger.CloseLogFile()

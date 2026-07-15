@@ -110,6 +110,28 @@ func HandleDevicesStatus(client *govee.Client) http.HandlerFunc {
 	}
 }
 
+// HandleLANRescan handles POST /api/v1/lan/rescan — the Settings Re-scan
+// button. Sends one multicast discovery packet and waits for the reply
+// window, then reports what answered. Free (no cloud budget).
+func HandleLANRescan(client *govee.Client) http.HandlerFunc {
+	log := logger.New(logger.ModuleHandler)
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !client.LANEnabled() {
+			v1types.RespondErrorMsg(w, http.StatusBadRequest, "LAN_DISABLED",
+				"LAN control is not running (disabled in config, or the UDP port could not be bound)")
+			return
+		}
+		client.LANRescan(r.Context())
+		routes := client.LANRoutes()
+		log.Info("LAN re-scan complete: %d device(s) answered", len(routes))
+		v1types.RespondOK(w, map[string]interface{}{
+			"discovered": len(routes),
+			"routes":     routes,
+		}, nil)
+	}
+}
+
 // controlBody is the manual-control request.
 type controlBody struct {
 	SKU      string          `json:"sku"`

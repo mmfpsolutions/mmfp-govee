@@ -56,6 +56,8 @@ func registerV1Routes(r chi.Router, cfgManager *config.Manager, client *govee.Cl
 		r.Get("/api/v1/settings", v1.HandleSettingsGet(cfgManager, client))
 		r.Put("/api/v1/settings", v1.HandleSettingsUpdate(cfgManager, engine))
 
+		r.Post("/api/v1/lan/rescan", v1.HandleLANRescan(client))
+
 		r.Get("/api/v1/activity", v1.HandleActivityList(act))
 	})
 }

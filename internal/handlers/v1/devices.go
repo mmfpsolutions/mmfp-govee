@@ -39,9 +39,15 @@ type deviceView struct {
 	// (type/instance/parameters) — the controller page's widget registry
 	// renders from these.
 	CapabilityDetails []govee.Capability `json:"capabilityDetails,omitempty"`
+	// LANControl reports a live LAN route: this device is served over UDP
+	// (fast, free, offline) instead of the cloud API. Drives the dashboard's
+	// LAN Control column — which is also the operator's feedback loop for
+	// toggling LAN Control on more devices in the Govee Home app.
+	LANControl bool   `json:"lanControl"`
+	LANIP      string `json:"lanIP,omitempty"`
 }
 
-func toDeviceViews(devices []govee.Device, cfg *config.Config) []deviceView {
+func toDeviceViews(devices []govee.Device, cfg *config.Config, lanRoutes map[string]govee.LANRoute) []deviceView {
 	views := make([]deviceView, 0, len(devices))
 	for _, d := range devices {
 		v := deviceView{
@@ -68,6 +74,10 @@ func toDeviceViews(devices []govee.Device, cfg *config.Config) []deviceView {
 			v.AssignedScene = cfg.DeviceScenes[d.Device]
 		}
 		v.CapabilityDetails = d.Capabilities
+		if route, ok := lanRoutes[d.Device]; ok {
+			v.LANControl = true
+			v.LANIP = route.IP
+		}
 		views = append(views, v)
 	}
 	return views
@@ -90,7 +100,7 @@ func HandleDevicesList(client *govee.Client, cfgManager *config.Manager) http.Ha
 			v1types.RespondErrorMsg(w, http.StatusBadGateway, "GOVEE_ERROR", err.Error())
 			return
 		}
-		data := devicesData{Devices: toDeviceViews(devices, cfgManager.GetConfig())}
+		data := devicesData{Devices: toDeviceViews(devices, cfgManager.GetConfig(), client.LANRoutes())}
 		if t := client.CachedAt(); !t.IsZero() {
 			data.CachedAt = t.Unix()
 		}
@@ -104,13 +114,16 @@ func HandleDevicesRefresh(client *govee.Client, cfgManager *config.Manager) http
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
+		// Manual refresh re-scans the LAN too — this is the operator's
+		// feedback loop after enabling LAN Control on a device in the app.
+		client.LANRescan(r.Context())
 		devices, err := client.RefreshDevices(r.Context())
 		if err != nil {
 			log.Error("Device refresh failed: %v", err)
 			v1types.RespondErrorMsg(w, http.StatusBadGateway, "GOVEE_ERROR", err.Error())
 			return
 		}
-		data := devicesData{Devices: toDeviceViews(devices, cfgManager.GetConfig())}
+		data := devicesData{Devices: toDeviceViews(devices, cfgManager.GetConfig(), client.LANRoutes())}
 		if t := client.CachedAt(); !t.IsZero() {
 			data.CachedAt = t.Unix()
 		}

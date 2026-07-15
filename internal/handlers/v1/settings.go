@@ -33,6 +33,13 @@ type settingsView struct {
 	LogLevel              string                   `json:"logLevel"`
 	GoveeCallsToday       int                      `json:"goveeCallsToday"`
 	GoveeCallsLimit       int                      `json:"goveeCallsLimit"`
+	// LAN fast path (see design-documents/lan-transport/). Running=false means
+	// disabled in config or the UDP port could not be bound; either way every
+	// device falls back to the cloud API.
+	LANEnabled    bool  `json:"lanEnabled"`    // config intent
+	LANRunning    bool  `json:"lanRunning"`    // actually bound + scanning
+	LANDiscovered int   `json:"lanDiscovered"` // devices with a live LAN route
+	LANLastScan   int64 `json:"lanLastScan,omitempty"`
 }
 
 // HandleSettingsGet handles GET /api/v1/settings
@@ -51,6 +58,12 @@ func HandleSettingsGet(cfgManager *config.Manager, client *govee.Client) http.Ha
 		}
 		if cfg.Logging != nil {
 			view.LogLevel = cfg.Logging.Level
+		}
+		view.LANEnabled = cfg.LANEnabled()
+		view.LANRunning = client.LANEnabled()
+		view.LANDiscovered = len(client.LANRoutes())
+		if t := client.LANLastScan(); !t.IsZero() {
+			view.LANLastScan = t.Unix()
 		}
 		v1types.RespondOK(w, view, nil)
 	}

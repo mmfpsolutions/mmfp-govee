@@ -28,6 +28,42 @@
         </div>
     </div>
 
+    <!-- LAN Control -->
+    <div class="device-card px-5 py-4 mb-4">
+        <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center space-x-3">
+                <span style="color: #4ade80;">&#128225;</span>
+                <span class="device-card-name">LAN Control</span>
+            </div>
+            <button onclick="rescanLAN(this)" id="lan-rescan-btn"
+                    class="text-xs px-3 py-1.5 rounded transition-colors"
+                    style="background: rgba(51, 65, 85, 0.5); color: #e2e8f0; border: 1px solid rgba(71, 85, 105, 0.5); cursor: pointer;">
+                Re-scan
+            </button>
+        </div>
+        <p class="text-sm mb-3" style="color: #94a3b8;">
+            Devices with LAN Control enabled in the Govee Home app are driven directly over your
+            network — faster, no API budget, and they keep working with the internet down. Scenes
+            always use the cloud API. Devices without it fall back to the cloud automatically.
+        </p>
+        <div class="data-row">
+            <span class="data-label">Status</span>
+            <span class="data-value" id="lan-status">--</span>
+        </div>
+        <div class="data-row">
+            <span class="data-label">Devices discovered</span>
+            <span class="data-value" id="lan-discovered">--</span>
+        </div>
+        <div class="data-row">
+            <span class="data-label">Last scan</span>
+            <span class="data-value" id="lan-last-scan">--</span>
+        </div>
+        <p class="text-xs mt-1" style="color: #64748b;">
+            Requires host networking in Docker (multicast). Set <span style="font-family: monospace;">"lan": {"enabled": false}</span>
+            in config.json to turn it off entirely.
+        </p>
+    </div>
+
     <!-- Quiet Hours -->
     <div class="device-card px-5 py-4 mb-4">
         <div class="flex items-center space-x-3 mb-3">

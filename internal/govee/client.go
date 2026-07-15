@@ -48,6 +48,7 @@ const (
 	CapRange       = "devices.capabilities.range"
 	InstPower      = "powerSwitch"
 	InstColorRgb   = "colorRgb"
+	InstColorTemp  = "colorTemperatureK"
 	InstBrightness = "brightness"
 
 	CapDynamicScene = "devices.capabilities.dynamic_scene"
@@ -159,6 +160,9 @@ type Client struct {
 	devices     []Device
 	devicesFrom time.Time
 	scenes      map[string][]Scene // device ID → scene catalog
+
+	// lan is the optional fast path (nil = cloud-only). See transport.go.
+	lan *lanService
 }
 
 // NewClient creates the Govee client. baseURL "" means production.
@@ -304,8 +308,13 @@ func (c *Client) RefreshDevices(ctx context.Context) ([]Device, error) {
 	return resp.Data, nil
 }
 
-// Control sends one capability write to a device.
+// Control sends one capability write to a device. Capabilities LAN speaks
+// (power/brightness/colorRgb/colorTemperatureK on a routed device) take the
+// fast path; everything else — scenes, segments, music, toggles — is cloud.
 func (c *Client) Control(ctx context.Context, sku, device, capType, instance string, value interface{}) error {
+	if handled, err := c.lanServe(device, capType, instance, value); handled {
+		return err
+	}
 	req := controlRequest{
 		RequestID: GenerateRequestID(),
 		Payload: controlPayload{
@@ -333,7 +342,14 @@ func (c *Client) Control(ctx context.Context, sku, device, capType, instance str
 
 // Convenience wrappers matching the capability set the effects engine uses.
 
+// Power, Color, and Brightness are the hot ops — they take the LAN fast path
+// when the device has a route (free, ~26ms, no budget), else cloud. Transport
+// resolution lives in transport.go; callers stay transport-blind.
+
 func (c *Client) Power(ctx context.Context, sku, device string, on bool) error {
+	if route, ok := c.lanRouteFor(device); ok {
+		return c.lan.Turn(route.IP, on)
+	}
 	v := 0
 	if on {
 		v = 1
@@ -342,10 +358,16 @@ func (c *Client) Power(ctx context.Context, sku, device string, on bool) error {
 }
 
 func (c *Client) Color(ctx context.Context, sku, device string, rgb int) error {
+	if route, ok := c.lanRouteFor(device); ok {
+		return c.lan.ColorRGB(route.IP, rgb)
+	}
 	return c.Control(ctx, sku, device, CapColor, InstColorRgb, rgb)
 }
 
 func (c *Client) Brightness(ctx context.Context, sku, device string, percent int) error {
+	if route, ok := c.lanRouteFor(device); ok {
+		return c.lan.Brightness(route.IP, percent)
+	}
 	return c.Control(ctx, sku, device, CapRange, InstBrightness, percent)
 }
 
@@ -379,7 +401,51 @@ func (c *Client) FullState(ctx context.Context, sku, device string) (online bool
 	return online, states, nil
 }
 
+// lanState reads devStatus over LAN and projects it into the cloud-shaped
+// stateResponse so callers cannot tell the difference. On timeout it drops the
+// stale route, kicks a re-scan, and reports failure so the caller falls back
+// to cloud. Note the projection is honest about LAN's blindness: it emits ONLY
+// the four fields LAN reports, plus online (a reply IS the online signal).
+func (c *Client) lanState(ctx context.Context, device string) (*stateResponse, bool) {
+	route, ok := c.lanRouteFor(device)
+	if !ok {
+		return nil, false
+	}
+	d, err := c.lan.Status(ctx, route.IP)
+	if err != nil {
+		c.lan.dropRoute(device)
+		return nil, false
+	}
+
+	rgb := (d.Color.R << 16) | (d.Color.G << 8) | d.Color.B
+	var resp stateResponse
+	resp.Code = 200
+	add := func(capType, instance string, v interface{}) {
+		raw, _ := json.Marshal(v)
+		resp.Payload.Capabilities = append(resp.Payload.Capabilities, struct {
+			Type     string `json:"type"`
+			Instance string `json:"instance"`
+			State    struct {
+				Value json.RawMessage `json:"value"`
+			} `json:"state"`
+		}{Type: capType, Instance: instance, State: struct {
+			Value json.RawMessage `json:"value"`
+		}{Value: raw}})
+	}
+	add("devices.capabilities.online", "online", true)
+	add(CapOnOff, InstPower, d.OnOff)
+	add(CapRange, InstBrightness, d.Brightness)
+	add(CapColor, InstColorRgb, rgb)
+	add(CapColor, InstColorTemp, d.ColorTemInKelvin)
+	return &resp, true
+}
+
 func (c *Client) fetchState(ctx context.Context, sku, device string) (*stateResponse, error) {
+	// LAN fast path (free, ~26ms). Falls through to cloud when there is no
+	// route or the route just went stale.
+	if resp, ok := c.lanState(ctx, device); ok {
+		return resp, nil
+	}
 	req := stateRequest{
 		RequestID: GenerateRequestID(),
 		Payload:   stateDevice{SKU: sku, Device: device},

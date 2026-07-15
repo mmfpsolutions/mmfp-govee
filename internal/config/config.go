@@ -42,6 +42,14 @@ type QuietHoursConfig struct {
 	End     string `json:"end"`   // "HH:MM" local time
 }
 
+// LANConfig gates Govee LAN Control — the UDP fast path for power/brightness/
+// color on devices that have LAN Control enabled in the Govee Home app.
+// Requires host networking in Docker (multicast); degrades to the cloud API
+// automatically when nothing answers, so it is safe to leave on anywhere.
+type LANConfig struct {
+	Enabled *bool `json:"enabled,omitempty"` // default TRUE
+}
+
 // Token is a per-caller webhook secret. The token value is encrypted at rest
 // (ENC: prefix) and decrypted at point of use.
 type Token struct {
@@ -104,6 +112,7 @@ type Config struct {
 	CookieMaxAge          int               `json:"cookieMaxAge,omitempty"`
 	Logging               *LoggingConfig    `json:"logging,omitempty"`
 	QuietHours            *QuietHoursConfig `json:"quietHours,omitempty"`
+	LAN                   *LANConfig        `json:"lan,omitempty"`
 	Tokens                []Token           `json:"tokens"`
 	Mappings              []Mapping         `json:"mappings"`
 	// DeviceScenes assigns each device its normal scene (keyed by device ID).
@@ -124,6 +133,15 @@ func (c *Config) AfterSceneFor(d DeviceRef) *SceneRef {
 		return c.DeviceScenes[d.Device]
 	}
 	return nil
+}
+
+// LANEnabled reports whether the LAN fast path should run. Defaults TRUE —
+// it self-disables when no device answers a scan.
+func (c *Config) LANEnabled() bool {
+	if c.LAN == nil || c.LAN.Enabled == nil {
+		return true
+	}
+	return *c.LAN.Enabled
 }
 
 // AuthDisabled reports whether the web UI auth gate is off. Auth is opt-in:

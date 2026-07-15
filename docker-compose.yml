@@ -1,0 +1,28 @@
+services:
+  mmfp-govee:
+    image: ghcr.io/mmfpsolutions/mmfp-govee:latest
+    container_name: mmfp-govee
+    restart: unless-stopped
+    # Host networking is REQUIRED for Govee LAN Control (optional feature).
+    # The LAN protocol discovers devices via UDP multicast (239.255.255.250:4001)
+    # and receives replies on :4002 — neither survives a bridge network.
+    #
+    # With host networking there is no port mapping: the app binds the host
+    # directly on webServerPort (3008) and webhookPort (8787) from config.json.
+    #
+    # NOTE: this only works on Linux. Docker Desktop for Mac/Windows runs
+    # containers in a VM, so host mode shares the VM's stack, not the host's —
+    # LAN discovery finds nothing there and every device falls back to the
+    # cloud API automatically. That is a supported (if slower) configuration:
+    # LAN is a bonus, never a requirement.
+    network_mode: host
+    volumes:
+      - ./config:/app/config
+      - ./logs:/app/logs
+    environment:
+      - TZ=America/New_York
+    # If you do NOT use Govee LAN Control, you can drop network_mode: host and
+    # publish ports the normal way instead:
+    # ports:
+    #   - "3008:3008"   # web app
+    #   - "8787:8787"   # webhook listener (GSS / GSSM point here)

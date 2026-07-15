@@ -12,6 +12,7 @@ package effects
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -267,6 +268,77 @@ func TestEngine_ActivityRecordsCarryDevices(t *testing.T) {
 			t.Errorf("outcome record devices = %v, want exactly one", r.Devices)
 		}
 	}
+}
+
+// verifyFake adds post-effect verification to the fake controller.
+type verifyFake struct {
+	fakeController
+	verifyErr error
+	verified  chan string
+}
+
+func (v *verifyFake) VerifyReachable(_ context.Context, _, device string) error {
+	select {
+	case v.verified <- device:
+	default:
+	}
+	return v.verifyErr
+}
+
+// LAN writes are fire-and-forget, so a silent device means the effect never
+// landed. The read-back must turn that into an honest failure, NOT "effect ok".
+func TestEngine_UnverifiedEffectReportsFailure(t *testing.T) {
+	fake := &verifyFake{
+		fakeController: *newFakeController(),
+		verifyErr:      errors.New("no devStatus reply from 192.168.7.75"),
+		verified:       make(chan string, 1),
+	}
+	act := activity.GetLog()
+	e := NewEngine(fake, act)
+	defer e.Stop()
+
+	e.Enqueue(testJob("m-unverified", "dev-v1"), 0)
+
+	select {
+	case <-fake.verified:
+	case <-time.After(5 * time.Second):
+		t.Fatal("verification was never attempted")
+	}
+
+	waitFor(t, func() bool {
+		for _, r := range act.Recent(0) {
+			if r.MappingID == "m-unverified" && r.Result != "queued" {
+				return true
+			}
+		}
+		return false
+	})
+	for _, r := range act.Recent(0) {
+		if r.MappingID == "m-unverified" && r.Result == "effect ok" {
+			t.Error("reported 'effect ok' for an unverified (silent) device")
+		}
+	}
+}
+
+// A verified effect reports ok as usual.
+func TestEngine_VerifiedEffectReportsOK(t *testing.T) {
+	fake := &verifyFake{
+		fakeController: *newFakeController(),
+		verified:       make(chan string, 1),
+	}
+	act := activity.GetLog()
+	e := NewEngine(fake, act)
+	defer e.Stop()
+
+	e.Enqueue(testJob("m-verified", "dev-v2"), 0)
+	waitFor(t, func() bool {
+		for _, r := range act.Recent(0) {
+			if r.MappingID == "m-verified" && r.Result == "effect ok" {
+				return true
+			}
+		}
+		return false
+	})
 }
 
 // Manual controls take the device lock (no interleave with effects) but skip

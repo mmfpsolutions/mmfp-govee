@@ -40,9 +40,21 @@ type SceneApplier interface {
 	ApplyScene(ctx context.Context, sku, device, instance string, value json.RawMessage) error
 }
 
-// The interface assertion happens at runtime (Controller is the declared
-// dependency); this guard makes any govee.Client drift a compile error.
-var _ SceneApplier = (*govee.Client)(nil)
+// Verifier is the optional Controller extension for post-effect verification
+// (govee.Client implements it). LAN writes are fire-and-forget UDP with no
+// ack, so "sent" proves nothing: after an effect we ask the transport to
+// confirm the device actually answered. On the cloud path this is a no-op
+// (every write already returned a status code), so it costs nothing there.
+type Verifier interface {
+	VerifyReachable(ctx context.Context, sku, device string) error
+}
+
+// The interface assertions happen at runtime (Controller is the declared
+// dependency); these guards make any govee.Client drift a compile error.
+var (
+	_ SceneApplier = (*govee.Client)(nil)
+	_ Verifier     = (*govee.Client)(nil)
+)
 
 // SceneRef names a scene to apply (from the device's scene catalog).
 type SceneRef struct {
@@ -297,6 +309,14 @@ func (e *Engine) runOnDevice(job Job, dev Device) {
 		e.record(job, dev.Device, "effect failed: "+err.Error())
 		return
 	}
+	if err := e.verify(ctx, dev); err != nil {
+		// The device never answered, so the effect did not land — say so
+		// rather than reporting a hopeful "ok". The transport has already
+		// dropped the stale route and re-scanned; the next event uses cloud.
+		e.log.Error("Effect %s on %s/%s sent but unverified: %v", job.Effect, dev.SKU, dev.Device, err)
+		e.record(job, dev.Device, "effect failed: device did not respond")
+		return
+	}
 	e.record(job, dev.Device, "effect ok")
 }
 
@@ -460,6 +480,16 @@ func (e *Engine) restore(ctx context.Context, dev Device, s *govee.DeviceState) 
 			e.log.Warn("Restore color for %s failed: %v", dev.Device, err)
 		}
 	}
+}
+
+// verify asks the transport to confirm the device answered after an effect.
+// No-op when the controller does not implement Verifier (test fakes).
+func (e *Engine) verify(ctx context.Context, dev Device) error {
+	v, ok := e.controller.(Verifier)
+	if !ok {
+		return nil
+	}
+	return v.VerifyReachable(ctx, dev.SKU, dev.Device)
 }
 
 func sleepCtx(ctx context.Context, d time.Duration) error {

@@ -8,7 +8,8 @@
  */
 
 // MMFP Govee — Devices dashboard (list view).
-// Columns: Status (clickable power icon) | Device Name | Model | Device ID.
+// Columns: Status (clickable power icon) | Device Name | Model | Device ID |
+// LAN Control.
 // The device name links to the controller page. Status doubles as the power
 // control: green=on, red=off,
 // gray=offline; state comes from a per-device sweep loaded AFTER the rows
@@ -122,11 +123,21 @@ function renderDevices(data) {
               (d.assignedScene ? '<div class="text-xs" style="color: #64748b;">scene: ' + escapeHtml(d.assignedScene.name) + '</div>' : '') + '</div>'
             : '<div class="text-sm" style="color: #94a3b8;">' + escapeHtml(d.deviceName) + '</div>';
 
+        // LAN Control: green check = served over UDP (fast, free, offline).
+        // Blank = cloud. Toggle LAN Control for a device in the Govee Home app,
+        // then hit Refresh and the check appears.
+        var lanCell = d.lanControl
+            ? '<div title="LAN Control active' + (d.lanIP ? ' — ' + escapeHtml(d.lanIP) : '') + '">' +
+                '<svg class="w-5 h-5" style="color: #4ade80;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">' +
+                '<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg></div>'
+            : '<div><span class="text-xs" style="color: #475569;" title="Served by the Govee cloud API">&mdash;</span></div>';
+
         return '<div class="list-row list-cols-devices" style="cursor: default;">' +
             statusCell +
             nameCell +
             '<div class="devices-col-model text-xs" style="color: #94a3b8;">' + escapeHtml(d.sku) + '</div>' +
             '<div class="devices-col-id text-xs" style="color: #64748b; font-family: monospace; overflow: hidden; text-overflow: ellipsis;">' + escapeHtml(d.device) + '</div>' +
+            lanCell +
         '</div>';
     }).join('');
 }

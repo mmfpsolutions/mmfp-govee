@@ -1106,7 +1106,7 @@ html {
 }
 
 /* ── MMFP Govee: Devices list view ─────────────────────────────
-   Columns: Status (power icon) | Device Name (→ controller) | Model | Device ID
+   Columns: Status (power icon) | Device Name (→ controller) | Model | Device ID | LAN
    Same .list-header/.list-row grid pairing as the GSSM canonical. */
 .list-cols-devices {
     display: grid;
@@ -1114,7 +1114,8 @@ html {
         70px                  /* Status (clickable power icon) */
         minmax(140px, 1fr)    /* Device Name (links to the controller) */
         70px                  /* Model */
-        minmax(150px, 220px); /* Device ID */
+        minmax(150px, 220px)  /* Device ID */
+        90px;                 /* LAN Control */
 }
 
 @media (max-width: 768px) {
@@ -1122,7 +1123,8 @@ html {
     .list-cols-devices {
         grid-template-columns:
             60px
-            minmax(100px, 1fr);
+            minmax(100px, 1fr)
+            70px;
     }
     .list-cols-devices .devices-col-model,
     .list-cols-devices .devices-col-id {

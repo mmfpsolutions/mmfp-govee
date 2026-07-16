@@ -25,7 +25,7 @@
 //     (see Dockerfile) which strips symbols and meaningfully raises the bar,
 //     but the ceiling is still "determined RE-skilled attacker wins."
 //
-// This matches the threat model GSS accepts for its pkg/crypto package — we
+// pkg/crypto package — we
 // trade a tiny CPU cost (~1-3 microseconds per AES decrypt) for a meaningful
 // defense-in-depth posture on disk and in transit-through-logs. Plaintext only
 // briefly exists on the stack of the function that needs it; nothing long-
@@ -46,6 +46,7 @@ const encPrefix = "ENC:"
 // encryptionKey is the AES-256 key embedded in the binary. Distinct from any
 // other product's key so each tool manages its own secret persistence
 // independently. See the package doc-comment for the threat-model framing.
+// Highly encouraged to change this key for your implementation, this is an example, do not re-use this key
 var encryptionKey = [32]byte{0x92, 0x52, 0xbe, 0x12, 0x23, 0x53, 0x88, 0x79, 0xca, 0x97, 0xd7, 0x38, 0x45, 0xac, 0xf2, 0x16, 0xbd, 0xdf, 0xc3, 0x27, 0x28, 0x97, 0x47, 0xf0, 0xbd, 0x70, 0x80, 0xda, 0xc7, 0x28, 0xe1, 0xd6}
 
 // Encrypt encrypts a plaintext string using AES-256-GCM with a random nonce.

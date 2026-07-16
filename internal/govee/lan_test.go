@@ -89,6 +89,7 @@ func newTestLANService(t *testing.T) *lanService {
 		controlPort: lanControlPort,
 		routes:      make(map[string]LANRoute),
 		waiters:     make(map[string][]chan lanStatusData),
+		lastSend:    make(map[string]time.Time),
 		ctx:         ctx,
 		cancel:      cancel,
 	}
@@ -266,5 +267,31 @@ func TestLAN_DropRouteDoesNotReseedStatics(t *testing.T) {
 	s.dropRoute("dev-static") // stale → also triggers a self-heal Scan()
 	if _, ok := s.Route("dev-static"); ok {
 		t.Error("dead static route was re-armed by the self-heal scan — it must stay on cloud until a manual re-scan")
+	}
+}
+
+// pace() must space consecutive writes to the same IP by at least
+// lanMinSendInterval — the fix for Govee devices dropping rapid-fire commands.
+func TestLAN_PaceSpacesSendsPerIP(t *testing.T) {
+	s := newTestLANService(t)
+	start := time.Now()
+	for i := 0; i < 3; i++ {
+		s.pace("192.168.1.5")
+	}
+	elapsed := time.Since(start)
+	want := 2 * lanMinSendInterval
+	if elapsed < want-10*time.Millisecond {
+		t.Errorf("3 paced sends took %v, want >= ~%v (device would drop them)", elapsed, want)
+	}
+}
+
+// Different IPs are NOT paced against each other — devices run in parallel.
+func TestLAN_PaceIsPerIP(t *testing.T) {
+	s := newTestLANService(t)
+	s.pace("10.0.0.1")
+	start := time.Now()
+	s.pace("10.0.0.2")
+	if elapsed := time.Since(start); elapsed > 20*time.Millisecond {
+		t.Errorf("send to a different IP waited %v; pacing must be per-IP", elapsed)
 	}
 }

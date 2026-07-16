@@ -49,6 +49,16 @@ const (
 	// How long a scan collects replies before the route set is considered
 	// settled.
 	lanScanWindow = 3 * time.Second
+
+	// lanMinSendInterval paces writes to a SINGLE device. Govee devices drop
+	// UDP commands that arrive too fast: a flash's opening power+brightness+
+	// color burst (microseconds apart over LAN) was being silently dropped, so
+	// effects logged "ok" while the lamp did nothing. VERIFIED on an H607C:
+	// 0ms spacing → dropped, ≥10ms → landed. We use 100ms — the same spacing
+	// the cloud path's spend() throttle always enforced (and never had this
+	// problem), with wide margin across device models. Per-IP, so different
+	// devices still run in parallel.
+	lanMinSendInterval = 100 * time.Millisecond
 )
 
 // lanStartupRetries are bounded re-scans after startup, then never again.
@@ -126,6 +136,10 @@ type lanService struct {
 	waitMu  sync.Mutex
 	waiters map[string][]chan lanStatusData
 
+	// lastSend paces writes per device IP (see lanMinSendInterval).
+	sendMu   sync.Mutex
+	lastSend map[string]time.Time
+
 	ctx    context.Context
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
@@ -145,6 +159,7 @@ func newLANService(log *logger.Logger) (*lanService, error) {
 		controlPort: lanControlPort,
 		routes:      make(map[string]LANRoute),
 		waiters:     make(map[string][]chan lanStatusData),
+		lastSend:    make(map[string]time.Time),
 		ctx:         ctx,
 		cancel:      cancel,
 	}
@@ -345,6 +360,7 @@ func (s *lanService) dropRoute(deviceID string) {
 // send fires one fire-and-forget command at a device. A nil error means the
 // packet left the host — NOT that the device got it or acted on it.
 func (s *lanService) send(ip string, payload interface{}) error {
+	s.pace(ip)
 	data, err := json.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("marshal LAN command: %w", err)
@@ -357,6 +373,28 @@ func (s *lanService) send(ip string, payload interface{}) error {
 		return fmt.Errorf("send LAN command to %s: %w", ip, err)
 	}
 	return nil
+}
+
+// pace enforces the minimum spacing between writes to one device IP. Govee
+// devices silently drop commands that arrive too fast. Callers to the SAME ip
+// are already serialized by the engine's per-device lock, but the reserved-
+// slot logic keeps this correct even if that ever changes.
+func (s *lanService) pace(ip string) {
+	if ip == "" {
+		return
+	}
+	s.sendMu.Lock()
+	now := time.Now()
+	wait := lanMinSendInterval - now.Sub(s.lastSend[ip])
+	if wait > 0 {
+		s.lastSend[ip] = s.lastSend[ip].Add(lanMinSendInterval)
+	} else {
+		s.lastSend[ip] = now
+	}
+	s.sendMu.Unlock()
+	if wait > 0 {
+		time.Sleep(wait)
+	}
 }
 
 func lanCmd(cmd string, data interface{}) map[string]interface{} {

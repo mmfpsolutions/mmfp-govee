@@ -12,7 +12,8 @@
     "quietHours": {
         "enabled": false,
         "start": "22:00",
-        "end": "07:00"
+        "end": "07:00",
+        "timezone": "America/New_York"
     },
     "lan": {
         "enabled": true,

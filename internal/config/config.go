@@ -38,8 +38,14 @@ type LoggingConfig struct {
 // only the light effects are skipped.
 type QuietHoursConfig struct {
 	Enabled bool   `json:"enabled"`
-	Start   string `json:"start"` // "HH:MM" local time
-	End     string `json:"end"`   // "HH:MM" local time
+	Start   string `json:"start"` // "HH:MM"
+	End     string `json:"end"`   // "HH:MM"
+	// Timezone is an optional IANA name (e.g. "America/New_York") that the
+	// window is evaluated in. Leave empty to use the host/container local
+	// time. Set it explicitly if you cannot guarantee the container's TZ:
+	// a container defaulting to UTC evaluates a 22:00-07:00 window four to
+	// five hours off, so alerts fire in the early morning.
+	Timezone string `json:"timezone,omitempty"`
 }
 
 // LANConfig gates Govee LAN Control — the UDP fast path for power/brightness/

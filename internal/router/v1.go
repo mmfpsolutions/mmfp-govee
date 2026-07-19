@@ -53,7 +53,7 @@ func registerV1Routes(r chi.Router, cfgManager *config.Manager, client *govee.Cl
 		r.Post("/api/v1/tokens", v1.HandleTokenCreate(cfgManager))
 		r.Delete("/api/v1/tokens/{name}", v1.HandleTokenDelete(cfgManager))
 
-		r.Get("/api/v1/settings", v1.HandleSettingsGet(cfgManager, client))
+		r.Get("/api/v1/settings", v1.HandleSettingsGet(cfgManager, client, engine))
 		r.Put("/api/v1/settings", v1.HandleSettingsUpdate(cfgManager, engine))
 
 		r.Post("/api/v1/lan/rescan", v1.HandleLANRescan(client))

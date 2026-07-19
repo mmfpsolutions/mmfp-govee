@@ -96,10 +96,39 @@ type Job struct {
 }
 
 // QuietHours mirrors config.QuietHoursConfig without importing config.
+// Timezone is an optional IANA name; empty means host local time.
 type QuietHours struct {
-	Enabled bool
-	Start   string // "HH:MM"
-	End     string // "HH:MM"
+	Enabled  bool
+	Start    string // "HH:MM"
+	End      string // "HH:MM"
+	Timezone string
+}
+
+// Location resolves the timezone the window is evaluated in. An empty or
+// unparseable name falls back to host local time (and the caller logs it).
+func (q QuietHours) Location() (*time.Location, error) {
+	if q.Timezone == "" {
+		return time.Local, nil
+	}
+	loc, err := time.LoadLocation(q.Timezone)
+	if err != nil {
+		return time.Local, err
+	}
+	return loc, nil
+}
+
+// Describe renders the effective window for logs and the Settings page —
+// quiet hours failing silently is what made a timezone mismatch invisible.
+func (q QuietHours) Describe(now time.Time) string {
+	if !q.Enabled {
+		return "disabled"
+	}
+	loc, err := q.Location()
+	tz := loc.String()
+	if err != nil {
+		tz = fmt.Sprintf("%s (INVALID — falling back to %s)", q.Timezone, loc)
+	}
+	return fmt.Sprintf("%s-%s %s (now %s)", q.Start, q.End, tz, now.In(loc).Format("15:04"))
 }
 
 // Engine runs effects asynchronously with per-device serialization,
@@ -276,6 +305,10 @@ func (e *Engine) transportFor(device string) string {
 	return ""
 }
 
+// InQuietHours reports whether effects are being suppressed right now — the
+// Settings page shows this so a timezone mismatch is visible immediately.
+func (e *Engine) InQuietHours() bool { return e.inQuietHours() }
+
 func (e *Engine) inQuietHours() bool {
 	e.quietMu.RLock()
 	q := e.quiet
@@ -286,9 +319,20 @@ func (e *Engine) inQuietHours() bool {
 	start, err1 := parseHHMM(q.Start)
 	end, err2 := parseHHMM(q.End)
 	if err1 != nil || err2 != nil {
-		return false // malformed window never suppresses
+		// Fail OPEN: a malformed window must not silently kill every alert on
+		// a mining monitor. Log it — silence is what hid the timezone bug.
+		e.log.Warn("Quiet hours window %q-%q is malformed; ignoring it (effects will fire)", q.Start, q.End)
+		return false
 	}
-	nowMin := e.now().Hour()*60 + e.now().Minute()
+	// Evaluate in the configured timezone, NOT blindly in container-local
+	// time: a container defaulting to UTC shifted the window hours off and
+	// fired alerts at 5am.
+	loc, err := q.Location()
+	if err != nil {
+		e.log.Warn("Quiet hours timezone %q is invalid (%v); using %s", q.Timezone, err, loc)
+	}
+	now := e.now().In(loc)
+	nowMin := now.Hour()*60 + now.Minute()
 	if start == end {
 		return false
 	}

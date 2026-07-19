@@ -79,7 +79,19 @@ ports require a restart. Secrets (`goveeApiKey`, token secrets) are encrypted at
 - `access.json` — `{"<username>": "<sha256-hex-of-password>"}`
 - `jsonWebTokenKey.json` — `{"jsonWebTokenKey": "<random-secret>", "expiresIn": "1h"}`
 
-**Quiet hours:** suppress effects inside a local-time window (webhooks are still logged).
+**Quiet hours:** suppress effects inside a time window (webhooks are still received and logged).
+
+The window is evaluated against **the app's own clock**, which in Docker is the *container's*
+timezone — not your laptop's. A container defaulting to UTC will evaluate a 22:00–07:00 window
+several hours off and fire alerts in the early morning. Either set `TZ` on the container
+(`TZ=America/New_York`, as `docker-compose.yml` does) or pin it in config so it cannot drift:
+
+```json
+"quietHours": { "enabled": true, "start": "22:00", "end": "07:00", "timezone": "America/New_York" }
+```
+
+The Settings page shows the app's current clock and whether it is suppressing right now — check
+there first if quiet hours misbehaves. Startup logs the effective window too.
 
 ## LAN Control (optional, faster)
 

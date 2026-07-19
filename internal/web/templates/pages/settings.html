@@ -71,6 +71,20 @@
             <span class="device-card-name">Quiet Hours</span>
         </div>
         <p class="text-sm mb-3" style="color: #94a3b8;">Inside this window webhooks are still received and logged, but no lights fire.</p>
+        <div class="data-row">
+            <span class="data-label">App clock</span>
+            <span class="data-value" id="settings-app-time">--</span>
+        </div>
+        <div class="data-row">
+            <span class="data-label">Suppressing now</span>
+            <span class="data-value" id="settings-quiet-now">--</span>
+        </div>
+        <p class="text-xs mb-3" style="color: #64748b;">
+            The window is evaluated against <span class="text-white">the app's own clock</span> shown above — not your
+            browser's. If that time or zone looks wrong, set <span style="font-family: monospace;">TZ</span> on the
+            container (e.g. <span style="font-family: monospace;">TZ=America/New_York</span>) or pin it in config.json:
+            <span style="font-family: monospace;">"quietHours": {"timezone": "America/New_York"}</span>.
+        </p>
         <div class="flex flex-wrap items-end gap-4">
             <div>
                 <label class="block text-sm mb-1.5" style="color: #94a3b8;">Enabled</label>

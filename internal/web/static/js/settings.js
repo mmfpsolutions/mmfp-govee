@@ -25,6 +25,23 @@ function loadSettings() {
         document.getElementById('settings-hook-port').textContent = s.webhookPort;
         document.getElementById('settings-log-level').value = s.logLevel || 'info';
 
+        // Quiet-hours diagnostics. Showing the APP's clock (not the browser's)
+        // is the point: a container running UTC evaluated a 22:00-07:00 window
+        // hours off and fired alerts at 5am with no visible clue.
+        var t = document.getElementById('settings-app-time');
+        t.textContent = (s.appTime || '--') + '  ' + (s.appTimezone || '');
+        var qn = document.getElementById('settings-quiet-now');
+        if (!s.quietHoursNow && s.quietHoursDesc === 'disabled') {
+            qn.textContent = 'no — quiet hours disabled';
+            qn.style.color = '#64748b';
+        } else if (s.quietHoursNow) {
+            qn.textContent = 'YES — effects are suppressed';
+            qn.style.color = '#a78bfa';
+        } else {
+            qn.textContent = 'no — outside ' + (s.quietHoursDesc || 'the window');
+            qn.style.color = '#94a3b8';
+        }
+
         // LAN Control status. "Running" means the UDP socket is bound and
         // scanning; discovering 0 devices is normal and harmless (everything
         // falls back to the cloud API).

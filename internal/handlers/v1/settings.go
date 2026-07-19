@@ -12,6 +12,7 @@ package v1
 import (
 	"net/http"
 	"runtime"
+	"time"
 
 	"github.com/mmfpsolutions/mmfp-govee/internal/config"
 	"github.com/mmfpsolutions/mmfp-govee/internal/effects"
@@ -40,10 +41,17 @@ type settingsView struct {
 	LANRunning    bool  `json:"lanRunning"`    // actually bound + scanning
 	LANDiscovered int   `json:"lanDiscovered"` // devices with a live LAN route
 	LANLastScan   int64 `json:"lanLastScan,omitempty"`
+	// Quiet-hours diagnostics — the app's OWN clock and whether the window is
+	// active right now. Surfaced because a container/host timezone mismatch is
+	// otherwise invisible until an alert fires at 5am.
+	AppTime        string `json:"appTime"`        // "15:04" as the app sees it
+	AppTimezone    string `json:"appTimezone"`    // zone the window is evaluated in
+	QuietHoursNow  bool   `json:"quietHoursNow"`  // suppressing right now?
+	QuietHoursDesc string `json:"quietHoursDesc"` // human summary
 }
 
 // HandleSettingsGet handles GET /api/v1/settings
-func HandleSettingsGet(cfgManager *config.Manager, client *govee.Client) http.HandlerFunc {
+func HandleSettingsGet(cfgManager *config.Manager, client *govee.Client, engine *effects.Engine) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cfg := cfgManager.GetConfig()
 		used, limit := client.CallsToday()
@@ -59,6 +67,23 @@ func HandleSettingsGet(cfgManager *config.Manager, client *govee.Client) http.Ha
 		if cfg.Logging != nil {
 			view.LogLevel = cfg.Logging.Level
 		}
+		// Quiet-hours diagnostics: report the app's own view of the clock.
+		qh := effects.QuietHours{}
+		if cfg.QuietHours != nil {
+			qh = effects.QuietHours{
+				Enabled:  cfg.QuietHours.Enabled,
+				Start:    cfg.QuietHours.Start,
+				End:      cfg.QuietHours.End,
+				Timezone: cfg.QuietHours.Timezone,
+			}
+		}
+		now := time.Now()
+		loc, _ := qh.Location()
+		view.AppTime = now.In(loc).Format("15:04")
+		view.AppTimezone = loc.String()
+		view.QuietHoursNow = engine.InQuietHours()
+		view.QuietHoursDesc = qh.Describe(now)
+
 		view.LANEnabled = cfg.LANEnabled()
 		view.LANRunning = client.LANEnabled()
 		view.LANDiscovered = len(client.LANRoutes())
@@ -105,6 +130,11 @@ func HandleSettingsUpdate(cfgManager *config.Manager, engine *effects.Engine) ht
 			clone.DisableAuthentication = req.DisableAuthentication
 		}
 		if req.QuietHours != nil {
+			// Preserve a hand-edited timezone: the Settings form does not
+			// expose it, so an empty value from the UI must not wipe it.
+			if req.QuietHours.Timezone == "" && clone.QuietHours != nil {
+				req.QuietHours.Timezone = clone.QuietHours.Timezone
+			}
 			clone.QuietHours = req.QuietHours
 		}
 		if req.LogLevel != nil {
@@ -124,9 +154,10 @@ func HandleSettingsUpdate(cfgManager *config.Manager, engine *effects.Engine) ht
 		// Hot-apply quiet hours to the running engine.
 		if clone.QuietHours != nil {
 			engine.SetQuietHours(effects.QuietHours{
-				Enabled: clone.QuietHours.Enabled,
-				Start:   clone.QuietHours.Start,
-				End:     clone.QuietHours.End,
+				Enabled:  clone.QuietHours.Enabled,
+				Start:    clone.QuietHours.Start,
+				End:      clone.QuietHours.End,
+				Timezone: clone.QuietHours.Timezone,
 			})
 		} else {
 			engine.SetQuietHours(effects.QuietHours{})

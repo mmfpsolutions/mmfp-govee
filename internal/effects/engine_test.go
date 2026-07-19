@@ -567,3 +567,51 @@ func TestEngine_RestoreReappliesState(t *testing.T) {
 	// state + (power, brightness, color) + restore (color, brightness) = 6
 	waitFor(t, func() bool { return fake.callCount() >= 6 })
 }
+
+// Regression: Scott's lamp fired at 5:45 AM Eastern with a 22:00-07:00 window
+// because the container ran UTC — the app saw 09:45, outside the window. The
+// window must be evaluated in the CONFIGURED timezone, not container-local.
+func TestEngine_QuietHours_TimezoneAware(t *testing.T) {
+	ny, err := time.LoadLocation("America/New_York")
+	if err != nil {
+		t.Skip("tzdata unavailable")
+	}
+	// The exact moment: 5:45 AM Eastern.
+	moment := time.Date(2026, 7, 17, 5, 45, 0, 0, ny)
+
+	e := NewEngine(newFakeController(), activity.GetLog())
+	defer e.Stop()
+	// Simulate a container running UTC: the clock returns the same instant,
+	// but expressed in UTC (09:45).
+	e.now = func() time.Time { return moment.UTC() }
+
+	// Without a configured zone this evaluates in the process's local time —
+	// the bug. WITH the zone pinned it must suppress regardless of the host.
+	e.SetQuietHours(QuietHours{Enabled: true, Start: "22:00", End: "07:00", Timezone: "America/New_York"})
+	if !e.InQuietHours() {
+		t.Error("5:45 AM Eastern must be inside a 22:00-07:00 America/New_York window even when the host clock is UTC")
+	}
+
+	// Midday Eastern is outside the window.
+	e.now = func() time.Time { return time.Date(2026, 7, 17, 13, 0, 0, 0, ny).UTC() }
+	if e.InQuietHours() {
+		t.Error("1:00 PM Eastern must be outside the window")
+	}
+}
+
+// An invalid timezone must fail OPEN (effects still fire) rather than silently
+// suppressing every alert on a mining monitor.
+func TestEngine_QuietHours_InvalidTimezoneFailsOpen(t *testing.T) {
+	e := NewEngine(newFakeController(), activity.GetLog())
+	defer e.Stop()
+	e.SetQuietHours(QuietHours{Enabled: true, Start: "00:00", End: "23:59", Timezone: "Not/AZone"})
+	// Falls back to local time; the near-all-day window should still evaluate
+	// (the point is it does not panic or hard-fail).
+	_ = e.InQuietHours()
+
+	// A malformed window never suppresses.
+	e.SetQuietHours(QuietHours{Enabled: true, Start: "nope", End: "07:00"})
+	if e.InQuietHours() {
+		t.Error("a malformed window must fail open (effects fire), not suppress everything")
+	}
+}

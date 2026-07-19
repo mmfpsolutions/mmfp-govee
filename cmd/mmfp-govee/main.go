@@ -134,11 +134,19 @@ func run() error {
 	act := activity.GetLog()
 	engine := effects.NewEngine(client, act)
 	if cfg.QuietHours != nil {
-		engine.SetQuietHours(effects.QuietHours{
-			Enabled: cfg.QuietHours.Enabled,
-			Start:   cfg.QuietHours.Start,
-			End:     cfg.QuietHours.End,
-		})
+		qh := effects.QuietHours{
+			Enabled:  cfg.QuietHours.Enabled,
+			Start:    cfg.QuietHours.Start,
+			End:      cfg.QuietHours.End,
+			Timezone: cfg.QuietHours.Timezone,
+		}
+		engine.SetQuietHours(qh)
+		// Log the EFFECTIVE window, including the timezone it is evaluated in.
+		// A container defaulting to UTC silently shifted a 22:00-07:00 window
+		// hours off and fired alerts at 5am; that must never be invisible again.
+		log.Info("Quiet hours: %s", qh.Describe(time.Now()))
+	} else {
+		log.Info("Quiet hours: not configured")
 	}
 
 	// Webhook listener (:8787)

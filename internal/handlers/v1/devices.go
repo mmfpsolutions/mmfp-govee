@@ -12,6 +12,8 @@ package v1
 import (
 	"net/http"
 	"net/url"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -47,9 +49,20 @@ type deviceView struct {
 	LANIP      string `json:"lanIP,omitempty"`
 }
 
+// isGroup reports whether a Govee "device" is actually a group (Bedroom
+// Group, Pathway lights, …). Groups cannot be controlled via the API — they
+// carry a *Group SKU (BaseGroup / SameModeGroup), an empty type, and no
+// capabilities — so they are omitted from every device-facing UI.
+func isGroup(d govee.Device) bool {
+	return strings.Contains(strings.ToLower(d.SKU), "group") || len(d.Capabilities) == 0
+}
+
 func toDeviceViews(devices []govee.Device, cfg *config.Config, lanRoutes map[string]govee.LANRoute) []deviceView {
 	views := make([]deviceView, 0, len(devices))
 	for _, d := range devices {
+		if isGroup(d) {
+			continue // groups aren't controllable — never show them
+		}
 		v := deviceView{
 			SKU:        d.SKU,
 			Device:     d.Device,
@@ -80,6 +93,11 @@ func toDeviceViews(devices []govee.Device, cfg *config.Config, lanRoutes map[str
 		}
 		views = append(views, v)
 	}
+	// Alphabetical by device name (case-insensitive) so the dashboard and the
+	// mapping-editor device picker read predictably.
+	sort.Slice(views, func(i, j int) bool {
+		return strings.ToLower(views[i].DeviceName) < strings.ToLower(views[j].DeviceName)
+	})
 	return views
 }
 

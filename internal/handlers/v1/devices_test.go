@@ -105,3 +105,44 @@ func TestHandleDeviceTest_DecodesEscapedDeviceID(t *testing.T) {
 		t.Fatal("engine never drove the device")
 	}
 }
+
+func lightCaps() []govee.Capability {
+	return []govee.Capability{
+		{Type: govee.CapOnOff, Instance: govee.InstPower},
+		{Type: govee.CapColor, Instance: govee.InstColorRgb},
+	}
+}
+
+// Groups are omitted and the rest come back alphabetical by name.
+func TestToDeviceViews_FiltersGroupsAndSorts(t *testing.T) {
+	devices := []govee.Device{
+		{Device: "d1", SKU: "H6022", DeviceName: "Table Lamp 2", Capabilities: lightCaps()},
+		{Device: "g1", SKU: "BaseGroup", DeviceName: "Bedroom Group"}, // group SKU
+		{Device: "d2", SKU: "H607C", DeviceName: "den floor lamp", Capabilities: lightCaps()},
+		{Device: "g2", SKU: "SameModeGroup", DeviceName: "Pathway lights"}, // group SKU
+		{Device: "d3", SKU: "H1370", DeviceName: "Bath Ceiling Fan", Capabilities: lightCaps()},
+		{Device: "g3", SKU: "H9999", DeviceName: "Weird Empty", Capabilities: nil}, // no caps → group-like
+	}
+
+	views := toDeviceViews(devices, &config.Config{}, nil)
+
+	if len(views) != 3 {
+		t.Fatalf("got %d views, want 3 (groups + capabilityless devices filtered)", len(views))
+	}
+	got := []string{views[0].DeviceName, views[1].DeviceName, views[2].DeviceName}
+	want := []string{"Bath Ceiling Fan", "den floor lamp", "Table Lamp 2"} // case-insensitive order
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("position %d = %q, want %q (full order: %v)", i, got[i], want[i], got)
+		}
+	}
+	for _, v := range views {
+		if isGroupName(v.DeviceName) {
+			t.Errorf("group %q leaked into the views", v.DeviceName)
+		}
+	}
+}
+
+func isGroupName(name string) bool {
+	return name == "Bedroom Group" || name == "Pathway lights" || name == "Weird Empty"
+}

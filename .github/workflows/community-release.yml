@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version number (e.g., 0.0.1)'
+        description: 'Version number (e.g., 0.0.6)'
         required: true
         type: string
   push:
@@ -36,15 +36,20 @@ jobs:
       - name: Build binary (test compilation)
         run: CGO_ENABLED=0 go build -v ./cmd/mmfp-govee
 
-  # Docker build job - builds and pushes the image (amd64 only for now; see below)
-  build-docker:
-    name: Build and Push Docker Images
+  # Resolve the version ONCE, before the per-architecture builds fan out.
+  #
+  # This used to live inside the build job. With a matrix that runs twice, and
+  # build_date coming from `date -u`, the two architectures would be stamped
+  # with DIFFERENT build dates — a manifest whose images disagree about when
+  # they were built.
+  prepare:
+    name: Resolve Version
     runs-on: ubuntu-latest
     needs: test
-    permissions:
-      contents: read
-      packages: write
-
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      build_date: ${{ steps.version.outputs.build_date }}
+      commit: ${{ steps.version.outputs.commit }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -68,27 +73,125 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "build_date=$(date -u +"%Y-%m-%dT%H:%M:%SZ")" >> $GITHUB_OUTPUT
           echo "commit=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION (source: $(cat $GITHUB_OUTPUT | grep source | cut -d= -f2))"
 
+  # Per-architecture build, each on a NATIVE runner.
+  #
+  # This replaces the old single-job QEMU emulation of linux/arm64: the arm64
+  # leg pulled the arm64 Go toolchain and ran `go build` instruction-by-
+  # instruction under translation. GitHub's ubuntu-24.04-arm runners are real
+  # arm64 hardware, so there is nothing to emulate and the QEMU step is gone
+  # entirely.
+  #
+  # Each job pushes an untagged, digest-addressed image. Tags are applied ONCE
+  # by the merge job below — if these jobs pushed tags the two architectures
+  # would race, and whichever finished last would leave a SINGLE-ARCH image
+  # sitting under :latest.
+  build-docker:
+    name: Build ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    needs: prepare
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            arch: amd64
+            runner: ubuntu-latest
+          - platform: linux/arm64
+            arch: arm64
+            runner: ubuntu-24.04-arm
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      # Mutates the working tree, so it must run in EACH matrix leg — it cannot
+      # move to the prepare job, whose checkout is discarded. Without it, config
+      # JSON is baked into a public image.
       - name: Exclude config files from Docker build
         run: |
           echo "" >> .dockerignore
           echo "# GitHub Actions: Exclude config files from public images" >> .dockerignore
           echo "config/*.json" >> .dockerignore
 
-      # TEMPORARY: amd64-only builds (Scott runs amd64; arm64 emulation is slow).
-      # Restore both this step and the platforms list below before going public.
-      # QEMU is ONLY needed to emulate a foreign arch — amd64 builds on an amd64
-      # runner natively, so this step is pure overhead while arm64 is off.
-      # - name: Set up QEMU
-      #   uses: docker/setup-qemu-action@v3
-      #   with:
-      #     platforms: linux/amd64,linux/arm64
-
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push by digest
+        id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: ${{ matrix.platform }}
+          # push-by-digest publishes the layers with no tag attached. The merge
+          # job assembles the tagged manifest list from the digests.
+          outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
+          labels: |
+            org.opencontainers.image.title=MMFP Govee
+            org.opencontainers.image.description=MMFP Govee - GSS/GSSM webhook to Govee light effects
+            org.opencontainers.image.vendor=MMFP Solutions
+            org.opencontainers.image.version=${{ needs.prepare.outputs.version }}
+          # Scoped per architecture. A shared scope has the two jobs evicting
+          # each other's layers and gives back the time this change saves.
+          cache-from: type=gha,scope=${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.arch }}
+          build-args: |
+            VERSION=${{ needs.prepare.outputs.version }}
+            BUILD_DATE=${{ needs.prepare.outputs.build_date }}
+            COMMIT=${{ needs.prepare.outputs.commit }}
+
+      - name: Export digest
+        run: |
+          mkdir -p ${{ runner.temp }}/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "${{ runner.temp }}/digests/${digest#sha256:}"
+
+      # Matrix jobs cannot reliably expose per-job outputs, so the digests are
+      # handed to the merge job as artifacts. This is Docker's documented
+      # pattern for multi-arch builds split across runners.
+      - name: Upload digest
+        uses: actions/upload-artifact@v7
+        with:
+          name: digest-${{ matrix.arch }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  # Assemble the multi-arch manifest and apply the tags. This is the only job
+  # that writes :latest and :<version>, so the published tags always point at a
+  # manifest list containing both architectures.
+  merge:
+    name: Publish Manifest
+    runs-on: ubuntu-latest
+    needs: [prepare, build-docker]
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Download digests
+        uses: actions/download-artifact@v8
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: digest-*
+          merge-multiple: true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -96,41 +199,59 @@ jobs:
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=raw,value=latest
-            type=raw,value=${{ steps.version.outputs.version }}
+            type=raw,value=${{ needs.prepare.outputs.version }}
           labels: |
             org.opencontainers.image.title=MMFP Govee
             org.opencontainers.image.description=MMFP Govee - GSS/GSSM webhook to Govee light effects
             org.opencontainers.image.vendor=MMFP Solutions
-            org.opencontainers.image.version=${{ steps.version.outputs.version }}
+            org.opencontainers.image.version=${{ needs.prepare.outputs.version }}
 
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          # TEMPORARY: amd64 only — restore `linux/amd64,linux/arm64` (and the
-          # QEMU step above) before publishing.
-          platforms: linux/amd64
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          build-args: |
-            VERSION=${{ steps.version.outputs.version }}
-            BUILD_DATE=${{ steps.version.outputs.build_date }}
-            COMMIT=${{ steps.version.outputs.commit }}
+      - name: Create manifest list and push
+        working-directory: ${{ runner.temp }}/digests
+        run: |
+          docker buildx imagetools create \
+            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@sha256:%s ' *)
+
+      - name: Verify both architectures are present
+        run: |
+          echo "Inspecting ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.prepare.outputs.version }}"
+          docker buildx imagetools inspect \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.prepare.outputs.version }}
+
+          # Fail loudly rather than publishing a half-populated manifest.
+          MANIFEST=$(docker buildx imagetools inspect --raw \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.prepare.outputs.version }})
+          for arch in amd64 arm64; do
+            if ! jq -e --arg a "$arch" \
+              '.manifests[] | select(.platform.architecture == $a)' <<< "$MANIFEST" > /dev/null; then
+              echo "::error::manifest is missing linux/$arch"
+              exit 1
+            fi
+          done
+          echo "Both linux/amd64 and linux/arm64 present."
 
       - name: Build Summary
         run: |
-          echo "Successfully built and pushed Docker image (linux/amd64)!"
+          echo "Successfully built and pushed multi-arch Docker images!"
           echo ""
-          echo "Version: ${{ steps.version.outputs.version }}"
+          echo "Images available at:"
+          echo "   https://github.com/${{ github.repository }}/pkgs/container/$(basename ${{ github.repository }})"
           echo ""
-          echo "Pull and run:"
+          echo "Version: ${{ needs.prepare.outputs.version }}"
+          echo "Build Date: ${{ needs.prepare.outputs.build_date }}"
+          echo "Commit: ${{ needs.prepare.outputs.commit }}"
+          echo ""
+          echo "Built natively: amd64 on ubuntu-latest, arm64 on ubuntu-24.04-arm (no QEMU)"
+          echo ""
+          echo "Tags pushed:"
+          echo "${{ steps.meta.outputs.tags }}" | tr ',' '\n' | sed 's/^/   - /'
+          echo ""
+          echo "Pull and run (no authentication required):"
           echo "   docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
           echo "   docker run -d -p 3008:3008 -p 8787:8787 -v ./config:/app/config ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"

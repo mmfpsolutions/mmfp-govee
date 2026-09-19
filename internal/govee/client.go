@@ -159,6 +159,7 @@ type Client struct {
 	cacheMu     sync.RWMutex
 	devices     []Device
 	devicesFrom time.Time
+	cachePath   string             // on-disk catalog ("" = memory only); see devicecache.go
 	scenes      map[string][]Scene // device ID → scene catalog
 
 	// lan is the optional fast path (nil = cloud-only). See transport.go.
@@ -261,12 +262,51 @@ func (c *Client) do(ctx context.Context, method, path string, body interface{}, 
 		return fmt.Errorf("govee returned status %d: %s", resp.StatusCode, string(respBody))
 	}
 
+	// Check Govee's OWN status code before decoding the typed payload.
+	//
+	// Govee signals backend failures with HTTP 200 + an in-body error code,
+	// and in that case `data` is an empty OBJECT where an array belongs:
+	//   {"code":400,"message":"request error: ChannelException","data":{}}
+	// Decoding straight into the typed struct therefore failed with a
+	// baffling "cannot unmarshal object into []govee.Device" that pointed at
+	// our parser instead of naming Govee's actual error (observed during a
+	// Govee cloud outage, 2026-09-19). Surface their message instead.
+	if err := checkGoveeEnvelope(respBody); err != nil {
+		return err
+	}
+
 	if out != nil {
 		if err := json.Unmarshal(respBody, out); err != nil {
 			return fmt.Errorf("parse govee response: %w", err)
 		}
 	}
 	return nil
+}
+
+// checkGoveeEnvelope reports a non-success application code from a Govee
+// response body. The message field is spelled "message" on most endpoints but
+// "msg" on /device/scenes, so both are read. A body with no code at all (0)
+// is left alone — only an explicit non-200 is an error.
+func checkGoveeEnvelope(body []byte) error {
+	var env struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+		Msg     string `json:"msg"`
+	}
+	if err := json.Unmarshal(body, &env); err != nil {
+		return nil // not the standard envelope; let the typed decode report it
+	}
+	if env.Code == 0 || env.Code == 200 {
+		return nil
+	}
+	msg := env.Message
+	if msg == "" {
+		msg = env.Msg
+	}
+	if msg == "" {
+		msg = "no message"
+	}
+	return fmt.Errorf("govee API error %d: %s", env.Code, msg)
 }
 
 // ListDevices returns the device list, from cache when available. Call
@@ -279,7 +319,34 @@ func (c *Client) ListDevices(ctx context.Context) ([]Device, error) {
 		return devices, nil
 	}
 	c.cacheMu.RUnlock()
-	return c.RefreshDevices(ctx)
+
+	devices, err := c.RefreshDevices(ctx)
+	if err == nil {
+		return devices, nil
+	}
+
+	// Cloud is unreachable and we have nothing in memory — this is the restart
+	// -during-an-outage case. Fall back to the catalog the last healthy run
+	// wrote to disk so the UI has something to draw. The stale fetch time
+	// rides along in CachedAt, which the Devices page already displays, so the
+	// age is visible rather than silently assumed current.
+	//
+	// Only ListDevices does this. RefreshDevices — the UI's Refresh button —
+	// keeps returning the real error, because that is the caller explicitly
+	// asking the cloud a question.
+	cached, cacheErr := c.loadDeviceCache()
+	if cacheErr != nil {
+		return nil, err
+	}
+
+	c.cacheMu.Lock()
+	c.devices = cached.Devices
+	c.devicesFrom = cached.CachedAt
+	c.cacheMu.Unlock()
+
+	c.log.Warn("Govee API unreachable (%v) — serving %d devices from the cached catalog (fetched %s)",
+		err, len(cached.Devices), cached.CachedAt.Format("2006-01-02 15:04"))
+	return cached.Devices, nil
 }
 
 // CachedAt returns when the device cache was last filled (zero = never).
@@ -299,10 +366,13 @@ func (c *Client) RefreshDevices(ctx context.Context) ([]Device, error) {
 		return nil, fmt.Errorf("govee devices error %d: %s", resp.Code, resp.Message)
 	}
 
+	now := time.Now()
 	c.cacheMu.Lock()
 	c.devices = resp.Data
-	c.devicesFrom = time.Now()
+	c.devicesFrom = now
 	c.cacheMu.Unlock()
+
+	c.saveDeviceCache(resp.Data, now)
 
 	c.log.Info("Device cache refreshed: %d devices", len(resp.Data))
 	return resp.Data, nil

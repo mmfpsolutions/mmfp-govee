@@ -116,6 +116,10 @@ func run() error {
 		return security.DecryptIfEncrypted(cfgManager.GetConfig().GoveeAPIKey)
 	}, "")
 
+	// Keep the device catalog across restarts. Without this a restart while
+	// the Govee cloud is down leaves the UI with no devices at all.
+	client.EnableDeviceCache(configDir)
+
 	// LAN Control fast path (optional; defaults on). Discovery is startup +
 	// bounded retries + manual Refresh + self-heal — never a polling timer.
 	// A bind failure or an empty scan is non-fatal: every device falls back to

@@ -14,6 +14,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 )
@@ -135,5 +136,76 @@ func TestGenerateRequestID_UUIDShape(t *testing.T) {
 	}
 	if id == GenerateRequestID() {
 		t.Fatal("consecutive request IDs identical")
+	}
+}
+
+// Govee signals backend failures with HTTP 200 + an in-body error code and
+// `data:{}` — an OBJECT where an array belongs. Decoding the typed payload
+// first turned that into "cannot unmarshal object into []govee.Device", which
+// blamed our parser instead of naming Govee's outage. These bodies are
+// VERBATIM from a real Govee cloud outage on 2026-09-19.
+func TestCheckGoveeEnvelope(t *testing.T) {
+	tests := []struct {
+		name    string
+		body    string
+		wantErr string
+	}{
+		{
+			name:    "outage: ConnectTimeoutException",
+			body:    `{"code":400,"message":"request error: ConnectTimeoutException","data":{}}`,
+			wantErr: "govee API error 400: request error: ConnectTimeoutException",
+		},
+		{
+			name:    "outage: ChannelException",
+			body:    `{"code":400,"message":"request error: ChannelException","data":{}}`,
+			wantErr: "govee API error 400: request error: ChannelException",
+		},
+		{
+			// /device/scenes spells it "msg", not "message".
+			name:    "msg field instead of message",
+			body:    `{"code":401,"msg":"invalid api key"}`,
+			wantErr: "govee API error 401: invalid api key",
+		},
+		{name: "success passes", body: `{"code":200,"message":"success","data":[]}`},
+		{name: "no code field passes", body: `{"foo":"bar"}`},
+		{name: "non-JSON passes (typed decode reports it)", body: `<html>502</html>`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := checkGoveeEnvelope([]byte(tt.body))
+			if tt.wantErr == "" {
+				if err != nil {
+					t.Fatalf("got error %v, want nil", err)
+				}
+				return
+			}
+			if err == nil {
+				t.Fatalf("got nil, want %q", tt.wantErr)
+			}
+			if err.Error() != tt.wantErr {
+				t.Errorf("got %q, want %q", err.Error(), tt.wantErr)
+			}
+		})
+	}
+}
+
+// End to end through do(): an outage body must surface Govee's message, NOT a
+// Go type error about []govee.Device.
+func TestListDevices_OutageSurfacesGoveeError(t *testing.T) {
+	client, srv := newTestClient(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK) // Govee answers 200 even when broken
+		w.Write([]byte(`{"code":400,"message":"request error: ChannelException","data":{}}`))
+	})
+	defer srv.Close()
+
+	_, err := client.RefreshDevices(context.Background())
+	if err == nil {
+		t.Fatal("expected an error")
+	}
+	if strings.Contains(err.Error(), "unmarshal") || strings.Contains(err.Error(), "parse govee response") {
+		t.Errorf("error blames our parser instead of Govee: %v", err)
+	}
+	if !strings.Contains(err.Error(), "ChannelException") {
+		t.Errorf("error does not carry Govee's message: %v", err)
 	}
 }

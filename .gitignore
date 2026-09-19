@@ -35,6 +35,7 @@ go.work.sum
 /design-documents/
 /troubleshooting/
 config.json
+devices-cache.json
 
 # Node / build artifacts
 node_modules/

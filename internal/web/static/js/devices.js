@@ -25,8 +25,11 @@ function loadDevices(refresh) {
     var call = refresh ? api.refreshDevices() : api.getDevices();
     call.then(function(resp) {
         renderDevices(resp.data || {});
-        loadStatuses();
-        loadSensors();
+        // Sensors load AFTER the sweep resolves, never alongside it. The
+        // power icons are what the page is for; the pool temperature is a
+        // bonus and must not compete with them for the Govee client's global
+        // call spacing.
+        loadStatuses().then(loadSensors);
     }).catch(function(err) {
         showDevicesError(err.message);
     });
@@ -34,19 +37,30 @@ function loadDevices(refresh) {
 
 function refreshDevices() {
     var btn = document.getElementById('devices-refresh-btn');
+    // The icon IS the progress indicator — don't touch textContent, that
+    // would wipe out the inline SVG. Tailwind's animate-spin goes on the
+    // <svg>, not the button, so the spin doesn't drag the tooltip with it.
+    //
+    // animate-spin turns clockwise, which runs AGAINST the arrowheads on this
+    // glyph. Tailwind has no reverse-spin utility, so the direction comes from
+    // an arbitrary property rather than a hand-rolled keyframe.
+    var icon = btn.querySelector('svg');
     btn.disabled = true;
-    btn.textContent = 'Refreshing...';
-    btn.style.opacity = '0.6';
+    if (icon) icon.classList.add('animate-spin', '[animation-direction:reverse]');
+    btn.title = 'Fetching...';
     api.refreshDevices().then(function(resp) {
         renderDevices(resp.data || {});
-        loadStatuses();
-        loadSensors();
+        // RETURNED so the spinner keeps turning until the statuses and the
+        // readout have actually landed — stopping it when the device list
+        // alone came back would claim the page was done while power icons
+        // were still blank.
+        return loadStatuses().then(loadSensors);
     }).catch(function(err) {
         showDevicesError(err.message);
     }).finally(function() {
         btn.disabled = false;
-        btn.textContent = 'Refresh from Govee';
-        btn.style.opacity = '';
+        if (icon) icon.classList.remove('animate-spin', '[animation-direction:reverse]');
+        btn.title = 'Fetch from Govee';
     });
 }
 
@@ -97,7 +111,7 @@ function renderDevices(data) {
 
     var cachedEl = document.getElementById('devices-cached-at');
     if (cachedEl && data.cachedAt) {
-        cachedEl.textContent = ' — fetched ' + new Date(data.cachedAt * 1000).toLocaleString();
+        cachedEl.textContent = 'Fetched ' + new Date(data.cachedAt * 1000).toLocaleString();
     }
 
     var list = document.getElementById('devices-list');
@@ -127,7 +141,7 @@ function renderDevices(data) {
 
         // LAN Control: green check = served over UDP (fast, free, offline).
         // Blank = cloud. Toggle LAN Control for a device in the Govee Home app,
-        // then hit Refresh and the check appears.
+        // then hit Fetch and the check appears.
         var lanCell = d.lanControl
             ? '<div title="LAN Control active' + (d.lanIP ? ' — ' + escapeHtml(d.lanIP) : '') + '">' +
                 '<svg class="w-5 h-5" style="color: #4ade80;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">' +
@@ -150,7 +164,8 @@ function renderDevices(data) {
 // either the capability declaration or the state payload, and converts to
 // whatever the Govee account is set to. Assumed °F.
 function loadSensors() {
-    api.getSensors().then(function(resp) {
+    // Returns the promise so the Fetch spinner can wait on it too.
+    return api.getSensors().then(function(resp) {
         var sensors = (resp.data && resp.data.sensors) || [];
         var box = document.getElementById('devices-sensors');
         if (!box) return;
@@ -158,17 +173,31 @@ function loadSensors() {
             box.style.display = 'none';
             return;
         }
+        var age = sensorAgeLabel(resp.data && resp.data.ageSecs);
         box.innerHTML = sensors.map(function(s) {
             var value = s.online ? s.value.toFixed(1) + '&deg;F' : '--';
             return '<span class="text-sm" style="color: #94a3b8;" title="' +
                 escapeHtml(s.deviceName) + '">' +
                 escapeHtml(shortSensorName(s.deviceName)) +
-                ' <span style="color: #e2e8f0; font-weight: 600;">' + value + '</span></span>';
+                ' <span style="color: #e2e8f0; font-weight: 600;">' + value + '</span>' +
+                (age ? ' <span class="text-xs" style="color: #64748b;">(' + age + ')</span>' : '') +
+                '</span>';
         }).join('');
         box.style.display = 'flex';
     }).catch(function(err) {
         console.error('Sensor read failed:', err.message);
     });
+}
+
+// How long ago the server actually asked Govee for this reading. The value is
+// served from a 5-minute cache, so without this a temperature that is minutes
+// stale looks live. Rendered from the server's age, not a browser clock, so a
+// wrong client time can't make a fresh reading look old.
+function sensorAgeLabel(secs) {
+    if (typeof secs !== 'number' || secs < 0) return '';
+    if (secs < 60) return 'just now';
+    if (secs < 3600) return Math.floor(secs / 60) + 'm ago';
+    return Math.floor(secs / 3600) + 'h ago';
 }
 
 // "Pool Thermometer" → "Pool". The device name is already in the tooltip, and
@@ -182,7 +211,8 @@ function shortSensorName(name) {
 // ── Status sweep (one state read per device, after rows render) ──
 
 function loadStatuses() {
-    api.getDevicesStatus().then(function(resp) {
+    // Returns the promise so callers can queue work after the sweep.
+    return api.getDevicesStatus().then(function(resp) {
         var statuses = (resp.data && resp.data.statuses) || {};
         Object.keys(statuses).forEach(function(device) {
             applyStatus(device, statuses[device]);

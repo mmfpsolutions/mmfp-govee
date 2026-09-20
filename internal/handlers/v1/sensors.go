@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/mmfpsolutions/mmfp-govee/internal/govee"
 	"github.com/mmfpsolutions/mmfp-govee/internal/logger"
@@ -45,6 +46,15 @@ func isTemperatureSensor(d govee.Device) bool {
 	return false
 }
 
+// sensorTTL is how long a reading is served without asking Govee again.
+//
+// A pool temperature moves over hours, and the sensor is a cloud-only device
+// (a BLE puck behind a gateway — it will never have a LAN route), measured at
+// 1.6-4.5s per read. Re-reading it on every page load put that latency, and
+// one more slot in the client's global 100ms call spacing, in front of the
+// user each time for a number that had not changed.
+const sensorTTL = 5 * time.Minute
+
 // HandleSensors handles GET /api/v1/sensors — current readings from the
 // read-only sensors in the catalog (temperature only for now).
 //
@@ -54,7 +64,27 @@ func isTemperatureSensor(d govee.Device) bool {
 func HandleSensors(client *govee.Client) http.HandlerFunc {
 	log := logger.New(logger.ModuleHandler)
 
+	// Closure state: the handler is built once at route registration.
+	var (
+		cacheMu  sync.Mutex
+		cached   []sensorReading
+		cachedAt time.Time
+	)
+
 	return func(w http.ResponseWriter, r *http.Request) {
+		cacheMu.Lock()
+		if !cachedAt.IsZero() && time.Since(cachedAt) < sensorTTL {
+			fresh := append([]sensorReading(nil), cached...)
+			age := time.Since(cachedAt)
+			cacheMu.Unlock()
+			v1types.RespondOK(w, map[string]interface{}{
+				"sensors": fresh,
+				"ageSecs": int(age.Seconds()),
+			}, nil)
+			return
+		}
+		cacheMu.Unlock()
+
 		devices, err := client.ListDevices(r.Context())
 		if err != nil {
 			v1types.RespondErrorMsg(w, http.StatusBadGateway, "GOVEE_ERROR", err.Error())
@@ -107,6 +137,15 @@ func HandleSensors(client *govee.Client) http.HandlerFunc {
 			return readings[i].DeviceName < readings[j].DeviceName
 		})
 
-		v1types.RespondOK(w, map[string]interface{}{"sensors": readings}, nil)
+		// Only cache a successful read. Caching an empty slice after a failed
+		// fetch would blank the readout for the whole TTL.
+		if len(readings) > 0 {
+			cacheMu.Lock()
+			cached = readings
+			cachedAt = time.Now()
+			cacheMu.Unlock()
+		}
+
+		v1types.RespondOK(w, map[string]interface{}{"sensors": readings, "ageSecs": 0}, nil)
 	}
 }

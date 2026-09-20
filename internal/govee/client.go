@@ -53,6 +53,13 @@ const (
 
 	CapDynamicScene = "devices.capabilities.dynamic_scene"
 	InstLightScene  = "lightScene"
+
+	// Read-only capability types: these REPORT a reading and command nothing.
+	// Govee returns pure sensors (thermometer, leak detector) from
+	// /user/devices alongside the lights, and they declare only these.
+	CapProperty = "devices.capabilities.property"
+	CapEvent    = "devices.capabilities.event"
+	CapOnline   = "devices.capabilities.online"
 )
 
 // Device is one entry from GET /user/devices.

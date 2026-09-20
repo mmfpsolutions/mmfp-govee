@@ -61,11 +61,38 @@ type deviceStatus struct {
 	PowerOn *int `json:"powerOn,omitempty"` // 1/0; nil = not reported
 }
 
-// HandleDevicesStatus handles GET /api/v1/devices/status — one state read
-// per cached device, fanned out concurrently (WaitGroup; the govee client's
-// throttle paces the actual calls). The dashboard fills its Status column
-// and power toggles from this. Manual refresh only — ~1 Govee call per
-// device per request.
+// worthStatusRead reports whether a state read for this device can actually
+// produce a Status column value.
+//
+// The sweep used to read EVERY device in the catalog, which was two kinds of
+// waste measured at 2-4.5s per call:
+//
+//   - Groups (BaseGroup / SameModeGroup) are filtered out of the dashboard by
+//     toDeviceViews and never rendered — and Govee answers a state read on one
+//     with "400: devices not exist" anyway, so every group cost seconds to
+//     produce an error for a row that does not exist.
+//   - Read-only sensors (leak detector, thermometer) declare no powerSwitch,
+//     so their state can never fill a power column.
+//
+// It reuses isControllable so this is exactly the device set the dashboard
+// draws, then narrows to those that can actually report a power state.
+func worthStatusRead(d govee.Device) bool {
+	if !isControllable(d) {
+		return false
+	}
+	for _, c := range d.Capabilities {
+		if c.Type == govee.CapOnOff && c.Instance == govee.InstPower {
+			return true
+		}
+	}
+	return false
+}
+
+// HandleDevicesStatus handles GET /api/v1/devices/status — one state read per
+// dashboard-visible, power-capable device, fanned out concurrently (WaitGroup;
+// the govee client's throttle paces the actual calls). The dashboard fills its
+// Status column and power toggles from this. Manual refresh only — ~1 Govee
+// call per device per request.
 func HandleDevicesStatus(client *govee.Client) http.HandlerFunc {
 	log := logger.New(logger.ModuleHandler)
 
@@ -82,6 +109,9 @@ func HandleDevicesStatus(client *govee.Client) http.HandlerFunc {
 
 		for _, d := range devices {
 			d := d
+			if !worthStatusRead(d) {
+				continue
+			}
 			wg.Add(1)
 			go func() {
 				defer wg.Done()

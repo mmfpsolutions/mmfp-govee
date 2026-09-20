@@ -83,3 +83,32 @@ func TestFindCapability(t *testing.T) {
 		t.Error("unknown device reported as found")
 	}
 }
+
+// The status sweep is bounded by its slowest call, so reading a device that
+// cannot produce a Status value is pure latency. Groups error with "devices
+// not exist" after seconds and are never rendered; sensors have no power
+// switch. Measured on a real catalog, dropping them halved the sweep.
+func TestWorthStatusRead(t *testing.T) {
+	power := []govee.Capability{{Type: govee.CapOnOff, Instance: govee.InstPower}}
+
+	tests := []struct {
+		name string
+		d    govee.Device
+		want bool
+	}{
+		{"lamp with power switch", govee.Device{SKU: "H607C", DeviceName: "Den Floor Lamp", Capabilities: power}, true},
+		{"base group", govee.Device{SKU: "BaseGroup", DeviceName: "Bedroom Group", Capabilities: power}, false},
+		{"same-mode group", govee.Device{SKU: "SameModeGroup", DeviceName: "Pathway lights", Capabilities: power}, false},
+		{"no capabilities at all", govee.Device{SKU: "H9999", DeviceName: "Odd"}, false},
+		{"leak sensor: no power switch", govee.Device{SKU: "H5059", DeviceName: "Attic Leak Detector-1",
+			Capabilities: []govee.Capability{{Type: "devices.capabilities.property", Instance: "sensorTemperature"}}}, false},
+		{"thermometer: no power switch", govee.Device{SKU: "H5310", DeviceName: "Pool Thermometer",
+			Capabilities: []govee.Capability{{Type: "devices.capabilities.property", Instance: "sensorTemperature"}}}, false},
+	}
+
+	for _, tt := range tests {
+		if got := worthStatusRead(tt.d); got != tt.want {
+			t.Errorf("%s: worthStatusRead = %v, want %v", tt.name, got, tt.want)
+		}
+	}
+}

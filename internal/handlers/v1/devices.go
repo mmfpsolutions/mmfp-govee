@@ -51,17 +51,46 @@ type deviceView struct {
 
 // isGroup reports whether a Govee "device" is actually a group (Bedroom
 // Group, Pathway lights, …). Groups cannot be controlled via the API — they
-// carry a *Group SKU (BaseGroup / SameModeGroup), an empty type, and no
-// capabilities — so they are omitted from every device-facing UI.
+// carry a *Group SKU (BaseGroup / SameModeGroup) and an empty type — and a
+// state read on one answers "400: devices not exist" after several seconds.
 func isGroup(d govee.Device) bool {
-	return strings.Contains(strings.ToLower(d.SKU), "group") || len(d.Capabilities) == 0
+	return strings.Contains(strings.ToLower(d.SKU), "group")
+}
+
+// isControllable reports whether this device belongs on a control surface at
+// all.
+//
+// Govee returns pure SENSORS from /user/devices alongside the lights: a
+// thermometer declaring only `property/sensorTemperature`, a leak detector
+// declaring only `event/bodyAppearedEvent`. Nothing on them can be commanded,
+// so a dashboard row for one is a control that isn't, showing a power icon
+// that can only ever read "?".
+//
+// The test is an EXCLUDE list of the read-only capability types, not an
+// include list of the controllable ones. If Govee ships a new controllable
+// type, an include list would silently hide those devices — the one failure
+// this must not have. An unrecognised type shows up as controllable instead,
+// which is visible and correctable.
+func isControllable(d govee.Device) bool {
+	if isGroup(d) {
+		return false
+	}
+	for _, c := range d.Capabilities {
+		switch c.Type {
+		case govee.CapProperty, govee.CapEvent, govee.CapOnline:
+			continue // reports a reading; commands nothing
+		default:
+			return true
+		}
+	}
+	return false // no capabilities at all, or read-only ones only
 }
 
 func toDeviceViews(devices []govee.Device, cfg *config.Config, lanRoutes map[string]govee.LANRoute) []deviceView {
 	views := make([]deviceView, 0, len(devices))
 	for _, d := range devices {
-		if isGroup(d) {
-			continue // groups aren't controllable — never show them
+		if !isControllable(d) {
+			continue // groups and read-only sensors are not control surfaces
 		}
 		v := deviceView{
 			SKU:        d.SKU,

@@ -146,3 +146,60 @@ func TestToDeviceViews_FiltersGroupsAndSorts(t *testing.T) {
 func isGroupName(name string) bool {
 	return name == "Bedroom Group" || name == "Pathway lights" || name == "Weird Empty"
 }
+
+// Govee returns pure sensors from /user/devices alongside the lights. They
+// belong on no control surface: a row for one is a power icon that can only
+// ever read "?".
+func TestIsControllable(t *testing.T) {
+	tests := []struct {
+		name string
+		d    govee.Device
+		want bool
+	}{
+		{"lamp", govee.Device{SKU: "H607C", Capabilities: lightCaps()}, true},
+		{"base group", govee.Device{SKU: "BaseGroup", Capabilities: lightCaps()}, false},
+		{"same-mode group", govee.Device{SKU: "SameModeGroup", Capabilities: lightCaps()}, false},
+		{"no capabilities", govee.Device{SKU: "H9999"}, false},
+		{"thermometer: property only", govee.Device{SKU: "H5310", Capabilities: []govee.Capability{
+			{Type: govee.CapProperty, Instance: "sensorTemperature"}}}, false},
+		{"leak detector: event only", govee.Device{SKU: "H5059", Capabilities: []govee.Capability{
+			{Type: govee.CapEvent, Instance: "bodyAppearedEvent"}}}, false},
+		{"online flag only", govee.Device{SKU: "H1", Capabilities: []govee.Capability{
+			{Type: govee.CapOnline, Instance: "online"}}}, false},
+		{"sensor that also dims is controllable", govee.Device{SKU: "H2", Capabilities: []govee.Capability{
+			{Type: govee.CapProperty, Instance: "sensorTemperature"},
+			{Type: govee.CapRange, Instance: govee.InstBrightness}}}, true},
+		// The exclude-list is deliberate: a capability type we've never seen
+		// must read as CONTROLLABLE. An include-list would silently hide
+		// devices when Govee ships a new control type.
+		{"unknown capability type shows, not hides", govee.Device{SKU: "H3", Capabilities: []govee.Capability{
+			{Type: "devices.capabilities.something_new", Instance: "x"}}}, true},
+	}
+
+	for _, tt := range tests {
+		if got := isControllable(tt.d); got != tt.want {
+			t.Errorf("%s: isControllable = %v, want %v", tt.name, got, tt.want)
+		}
+	}
+}
+
+// The dashboard list and the status sweep must agree on what exists.
+func TestToDeviceViews_DropsSensors(t *testing.T) {
+	devices := []govee.Device{
+		{Device: "d1", SKU: "H607C", DeviceName: "Den Floor Lamp", Capabilities: lightCaps()},
+		{Device: "s1", SKU: "H5310", DeviceName: "Pool Thermometer", Capabilities: []govee.Capability{
+			{Type: govee.CapProperty, Instance: "sensorTemperature"}}},
+		{Device: "s2", SKU: "H5059", DeviceName: "Attic Leak Detector-1", Capabilities: []govee.Capability{
+			{Type: govee.CapEvent, Instance: "bodyAppearedEvent"}}},
+	}
+
+	views := toDeviceViews(devices, &config.Config{}, nil)
+	if len(views) != 1 || views[0].DeviceName != "Den Floor Lamp" {
+		t.Fatalf("got %d views (%+v), want only the lamp", len(views), views)
+	}
+	for _, d := range devices[1:] {
+		if worthStatusRead(d) {
+			t.Errorf("%s would still be swept for status though it isn't rendered", d.DeviceName)
+		}
+	}
+}

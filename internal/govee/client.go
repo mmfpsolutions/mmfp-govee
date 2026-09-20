@@ -58,8 +58,14 @@ const (
 	// Govee returns pure sensors (thermometer, leak detector) from
 	// /user/devices alongside the lights, and they declare only these.
 	CapProperty = "devices.capabilities.property"
-	CapEvent    = "devices.capabilities.event"
-	CapOnline   = "devices.capabilities.online"
+	// Govee returns a bare number here with NO unit field anywhere in the
+	// capability declaration or the state payload. Scott's H5310 pool
+	// thermometer reads 83.84, which is exactly 28.8 °C converted — their
+	// backend converts to the Govee account's unit, so this follows the app
+	// setting rather than being fixed. Treated as °F.
+	InstSensorTemperature = "sensorTemperature"
+	CapEvent              = "devices.capabilities.event"
+	CapOnline             = "devices.capabilities.online"
 )
 
 // Device is one entry from GET /user/devices.
@@ -707,6 +713,8 @@ func (c *Client) ListScenes(ctx context.Context, sku, device string, refresh boo
 			}
 		}
 	}
+
+	sortScenes(scenes)
 
 	c.cacheMu.Lock()
 	if c.scenes == nil {

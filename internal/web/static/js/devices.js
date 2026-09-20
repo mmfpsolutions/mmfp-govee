@@ -26,6 +26,7 @@ function loadDevices(refresh) {
     call.then(function(resp) {
         renderDevices(resp.data || {});
         loadStatuses();
+        loadSensors();
     }).catch(function(err) {
         showDevicesError(err.message);
     });
@@ -39,6 +40,7 @@ function refreshDevices() {
     api.refreshDevices().then(function(resp) {
         renderDevices(resp.data || {});
         loadStatuses();
+        loadSensors();
     }).catch(function(err) {
         showDevicesError(err.message);
     }).finally(function() {
@@ -140,6 +142,41 @@ function renderDevices(data) {
             lanCell +
         '</div>';
     }).join('');
+}
+
+// ── Sensor readout (read-only devices: no control row, just a value) ──
+
+// Temperatures come back as a bare number — Govee sends no unit field in
+// either the capability declaration or the state payload, and converts to
+// whatever the Govee account is set to. Assumed °F.
+function loadSensors() {
+    api.getSensors().then(function(resp) {
+        var sensors = (resp.data && resp.data.sensors) || [];
+        var box = document.getElementById('devices-sensors');
+        if (!box) return;
+        if (!sensors.length) {
+            box.style.display = 'none';
+            return;
+        }
+        box.innerHTML = sensors.map(function(s) {
+            var value = s.online ? s.value.toFixed(1) + '&deg;F' : '--';
+            return '<span class="text-sm" style="color: #94a3b8;" title="' +
+                escapeHtml(s.deviceName) + '">' +
+                escapeHtml(shortSensorName(s.deviceName)) +
+                ' <span style="color: #e2e8f0; font-weight: 600;">' + value + '</span></span>';
+        }).join('');
+        box.style.display = 'flex';
+    }).catch(function(err) {
+        console.error('Sensor read failed:', err.message);
+    });
+}
+
+// "Pool Thermometer" → "Pool". The device name is already in the tooltip, and
+// the header has room for a value, not a sentence.
+function shortSensorName(name) {
+    return String(name)
+        .replace(/\s*(thermometer|sensor|monitor|detector)\b.*$/i, '')
+        .trim() || name;
 }
 
 // ── Status sweep (one state read per device, after rows render) ──

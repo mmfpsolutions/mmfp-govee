@@ -15,6 +15,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 	"time"
 )
 
@@ -59,6 +61,8 @@ func (c *Client) EnableSceneCache(configDir string) {
 		c.scenes = make(map[string]sceneEntry, len(loaded))
 	}
 	for device, entry := range loaded {
+		// Caches written before scenes were sorted come back in Govee's order.
+		sortScenes(entry.Scenes)
 		c.scenes[device] = entry
 	}
 	n := len(c.scenes)
@@ -168,6 +172,30 @@ func (c *Client) WarmSceneCache(ctx context.Context, devices []Device) {
 		warmed++
 	}
 	c.log.Info("Scene catalog warm complete: %d of %d device(s)", warmed, len(missing))
+}
+
+// sortScenes orders a scene catalog alphabetically, case-insensitively.
+//
+// Govee returns scenes in its own order, which is neither alphabetical nor
+// meaningfully grouped: the categories the Govee Home app shows (Nature,
+// Festival, Sleep, …) come from their consumer backend and are NOT in the
+// Developer API payload — an option is only {name, value}. With 60-161 scenes
+// per device and no categories to lean on, alphabetical is the only ordering
+// available that makes a name findable in the dropdown.
+//
+// Called where a list is BUILT (after a fetch, and when priming from disk),
+// never on the cached slice per-read: that slice is shared with concurrent
+// readers, so sorting it in place would be a data race.
+func sortScenes(scenes []Scene) {
+	sort.Slice(scenes, func(i, j int) bool {
+		a, b := strings.ToLower(scenes[i].Name), strings.ToLower(scenes[j].Name)
+		if a != b {
+			return a < b
+		}
+		// A DIY scene can share a name with a built-in one; keep the order
+		// deterministic so the dropdown doesn't shuffle between reloads.
+		return scenes[i].Instance < scenes[j].Instance
+	})
 }
 
 func hasSceneCapability(d Device) bool {

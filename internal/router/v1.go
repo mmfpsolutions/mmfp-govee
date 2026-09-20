@@ -34,6 +34,7 @@ func registerV1Routes(r chi.Router, cfgManager *config.Manager, client *govee.Cl
 
 		r.Get("/api/v1/devices", v1.HandleDevicesList(client, cfgManager))
 		r.Get("/api/v1/devices/status", v1.HandleDevicesStatus(client))
+		r.Get("/api/v1/sensors", v1.HandleSensors(client))
 		r.Post("/api/v1/devices/refresh", v1.HandleDevicesRefresh(client, cfgManager))
 		r.Post("/api/v1/devices/{device}/test", v1.HandleDeviceTest(engine, cfgManager))
 		r.Get("/api/v1/devices/{device}/scenes", v1.HandleDeviceScenes(client))

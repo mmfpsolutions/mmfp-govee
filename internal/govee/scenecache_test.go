@@ -12,6 +12,8 @@ package govee
 import (
 	"context"
 	"net/http"
+	"os"
+	"path/filepath"
 	"sync/atomic"
 	"testing"
 )
@@ -150,5 +152,84 @@ func TestSceneCache_WarmSkipsDevicesPrimedFromDisk(t *testing.T) {
 	restarted.WarmSceneCache(context.Background(), []Device{sceneCapDevice("dev-1"), sceneCapDevice("dev-2")})
 	if got := atomic.LoadInt32(&hits); got != 2 {
 		t.Errorf("warm made %d calls, want 2 (only dev-2; dev-1 came from disk)", got)
+	}
+}
+
+// Govee returns scenes in its own order and exposes no categories, so the
+// dropdown's only chance of being navigable is alphabetical.
+func TestSceneCache_ScenesComeBackSorted(t *testing.T) {
+	client, srv := newTestClient(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/device/diy-scenes" {
+			// A DIY scene that sorts into the middle, and one that collides
+			// with a built-in name.
+			w.Write([]byte(`{"code":200,"msg":"success","payload":{"capabilities":[
+			  {"type":"devices.capabilities.dynamic_scene","instance":"diyScene","parameters":{"options":[
+			    {"name":"Nightlight","value":{"paramId":3,"id":3}},
+			    {"name":"aurora","value":{"paramId":4,"id":4}}
+			  ]}}
+			]}}`))
+			return
+		}
+		w.Write([]byte(`{"code":200,"msg":"success","payload":{"capabilities":[
+		  {"type":"devices.capabilities.dynamic_scene","instance":"lightScene","parameters":{"options":[
+		    {"name":"Sunset","value":{"paramId":1,"id":1}},
+		    {"name":"Aurora","value":{"paramId":2,"id":2}},
+		    {"name":"dracarys","value":{"paramId":5,"id":5}}
+		  ]}}
+		]}}`))
+	})
+	defer srv.Close()
+	client.EnableSceneCache(t.TempDir())
+
+	scenes, err := client.ListScenes(context.Background(), "H607C", "dev-1", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Case-insensitive: "aurora" and "Aurora" sort together, not in two
+	// separate ASCII blocks with the lowercase names exiled to the end.
+	want := []string{"aurora", "Aurora", "dracarys", "Nightlight", "Sunset"}
+	if len(scenes) != len(want) {
+		t.Fatalf("got %d scenes, want %d", len(scenes), len(want))
+	}
+	for i, w := range want {
+		if scenes[i].Name != w {
+			got := make([]string, len(scenes))
+			for j, s := range scenes {
+				got[j] = s.Name
+			}
+			t.Fatalf("position %d = %q, want %q (full order: %v)", i, scenes[i].Name, w, got)
+		}
+	}
+	// The name collision must break deterministically by instance
+	// ("diyScene" < "lightScene"); which one wins matters less than it being
+	// stable across reloads.
+	if scenes[0].Instance != "diyScene" || scenes[1].Instance != "lightScene" {
+		t.Errorf("tie-break wrong: %q then %q", scenes[0].Instance, scenes[1].Instance)
+	}
+}
+
+// A cache written before sorting existed must come back sorted, not in
+// whatever order it happens to hold on disk.
+func TestSceneCache_PrimingSortsLegacyCache(t *testing.T) {
+	dir := t.TempDir()
+	legacy := `{"devices":{"dev-1":{"sku":"H607C","cachedAt":"2026-09-19T20:00:00Z","scenes":[
+	  {"name":"Sunset","instance":"lightScene","value":{"id":1}},
+	  {"name":"Aurora","instance":"lightScene","value":{"id":2}}
+	]}}}`
+	if err := os.WriteFile(filepath.Join(dir, sceneCacheFile), []byte(legacy), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	client, srv := newTestClient(sceneHandler(nil))
+	defer srv.Close()
+	client.EnableSceneCache(dir)
+
+	scenes, err := client.ListScenes(context.Background(), "H607C", "dev-1", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(scenes) != 2 || scenes[0].Name != "Aurora" {
+		t.Errorf("legacy cache served unsorted: %+v", scenes)
 	}
 }

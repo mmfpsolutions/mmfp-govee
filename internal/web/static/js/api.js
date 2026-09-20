@@ -91,6 +91,10 @@ class APIClient {
         return this.get('/api/v1/devices/status');
     }
 
+    async getSensors() {
+        return this.get('/api/v1/sensors');
+    }
+
     async getDeviceState(device, sku) {
         return this.get('/api/v1/devices/' + encodeURIComponent(device) + '/state?sku=' + encodeURIComponent(sku));
     }

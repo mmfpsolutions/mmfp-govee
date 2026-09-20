@@ -112,3 +112,37 @@ func TestWorthStatusRead(t *testing.T) {
 		}
 	}
 }
+
+// The sensor readout and the control list are deliberately different
+// surfaces: a device that reports a temperature but commands nothing gets a
+// readout and NO control row.
+func TestIsTemperatureSensor(t *testing.T) {
+	thermometer := govee.Device{SKU: "H5310", DeviceName: "Pool Thermometer",
+		Capabilities: []govee.Capability{{Type: govee.CapProperty, Instance: govee.InstSensorTemperature}}}
+	leak := govee.Device{SKU: "H5059", DeviceName: "Attic Leak Detector-1",
+		Capabilities: []govee.Capability{{Type: govee.CapEvent, Instance: "bodyAppearedEvent"}}}
+	lamp := govee.Device{SKU: "H607C", DeviceName: "Den Floor Lamp",
+		Capabilities: []govee.Capability{{Type: govee.CapOnOff, Instance: govee.InstPower}}}
+
+	if !isTemperatureSensor(thermometer) {
+		t.Error("thermometer not recognised as a temperature sensor")
+	}
+	if isTemperatureSensor(leak) {
+		t.Error("leak detector reports no temperature; it must not appear in the readout")
+	}
+	if isTemperatureSensor(lamp) {
+		t.Error("lamp is not a sensor")
+	}
+
+	// The two surfaces must not overlap: nothing in the readout gets a
+	// control row, and nothing controllable gets swept as a sensor.
+	if isControllable(thermometer) {
+		t.Error("thermometer would get a dashboard control row")
+	}
+	if worthStatusRead(thermometer) {
+		t.Error("thermometer would be swept for power state it cannot report")
+	}
+	if isTemperatureSensor(lamp) || !isControllable(lamp) {
+		t.Error("lamp landed on the wrong surface")
+	}
+}

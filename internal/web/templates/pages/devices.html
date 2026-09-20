@@ -18,11 +18,17 @@
                 <h1 class="text-2xl font-bold text-white">Govee Devices</h1>
                 <p class="text-sm mt-1" style="color: #94a3b8;">Cached from the Govee API<span id="devices-cached-at"></span></p>
             </div>
-            <button id="devices-refresh-btn" onclick="refreshDevices()"
+            <div class="flex items-center gap-4">
+                <!-- Read-only sensor readout. These devices have no control row
+                     (nothing on them can be commanded), so this is the only place
+                     their reading surfaces. Hidden until a value arrives. -->
+                <div id="devices-sensors" class="items-center gap-3" style="display: none;"></div>
+                <button id="devices-refresh-btn" onclick="refreshDevices()"
                     class="px-4 py-2 rounded text-sm font-medium transition-colors"
                     style="background: linear-gradient(90deg, #3b82f6, #2563eb); color: white; border: none; cursor: pointer;">
                 Refresh from Govee
-            </button>
+                </button>
+            </div>
         </div>
 
         <div class="list-header list-cols-devices">

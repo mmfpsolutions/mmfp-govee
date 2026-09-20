@@ -37,12 +37,33 @@ type deviceCache struct {
 }
 
 // EnableDeviceCache points the client at a directory in which to keep the
-// device catalog across restarts. Disabled (in-memory only) when never called,
-// which is how the tests run.
+// device catalog across restarts, and primes memory from whatever is already
+// there. Disabled (in-memory only) when never called, which is how the tests
+// run.
+//
+// Priming matters for SPEED, not just for outages: without it the first page
+// load after a restart pays a full cloud round-trip — and during an outage,
+// a full 10s timeout — before the fallback can serve anything. The caller is
+// expected to kick a background refresh afterwards so a primed catalog still
+// gets brought up to date on a healthy start.
 func (c *Client) EnableDeviceCache(configDir string) {
 	c.cacheMu.Lock()
 	c.cachePath = filepath.Join(configDir, deviceCacheFile)
 	c.cacheMu.Unlock()
+
+	cached, err := c.loadDeviceCache()
+	if err != nil {
+		c.log.Debug("No device cache to prime: %v", err)
+		return
+	}
+
+	c.cacheMu.Lock()
+	c.devices = cached.Devices
+	c.devicesFrom = cached.CachedAt
+	c.cacheMu.Unlock()
+
+	c.log.Info("Device catalog primed from cache: %d devices (fetched %s)",
+		len(cached.Devices), cached.CachedAt.Format("2006-01-02 15:04"))
 }
 
 // saveDeviceCache writes the catalog to disk. Best-effort: a failure here must

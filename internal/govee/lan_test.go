@@ -13,6 +13,7 @@ import (
 	"context"
 	"encoding/json"
 	"net"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -28,7 +29,9 @@ type fakeDevice struct {
 	replyTo  *net.UDPAddr
 	t        *testing.T
 	received chan lanEnvelope
-	silent   bool // simulate a device that stopped answering
+	// silent simulates a device that stopped answering. Atomic because the
+	// test sets it after newFakeDevice has already started serve().
+	silent atomic.Bool
 }
 
 func newFakeDevice(t *testing.T, replyPort int) *fakeDevice {
@@ -64,7 +67,7 @@ func (d *fakeDevice) serve() {
 		case d.received <- env:
 		default:
 		}
-		if env.Msg.Cmd == "devStatus" && !d.silent {
+		if env.Msg.Cmd == "devStatus" && !d.silent.Load() {
 			reply := []byte(`{"msg":{"cmd":"devStatus","data":{"onOff":1,"brightness":42,` +
 				`"color":{"r":0,"g":255,"b":0},"colorTemInKelvin":0}}}`)
 			d.conn.WriteToUDP(reply, d.replyTo)
@@ -146,7 +149,7 @@ func TestLAN_StatusRoundTrip(t *testing.T) {
 func TestLAN_StatusTimeoutOnSilentDevice(t *testing.T) {
 	s := newTestLANService(t)
 	dev := newFakeDevice(t, s.listenPort())
-	dev.silent = true // device stopped answering — the stale-route case
+	dev.silent.Store(true) // device stopped answering — the stale-route case
 	defer dev.close()
 
 	s.controlPort = dev.port()

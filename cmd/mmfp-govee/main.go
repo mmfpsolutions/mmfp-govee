@@ -117,8 +117,29 @@ func run() error {
 	}, "")
 
 	// Keep the device catalog across restarts. Without this a restart while
-	// the Govee cloud is down leaves the UI with no devices at all.
+	// the Govee cloud is down leaves the UI with no devices at all. Priming
+	// from disk also means the first page load never waits on the cloud.
 	client.EnableDeviceCache(configDir)
+
+	// Scene catalogs are fetched per device and are otherwise memory-only, so
+	// a restart used to leave every scene dropdown empty until each detail
+	// page was reopened — and during a cloud outage it could not refill at all.
+	client.EnableSceneCache(configDir)
+
+	// Bring the primed catalog up to date in the background. The cache has no
+	// expiry — once memory is populated nothing re-fetches until the Refresh
+	// button — so without this a device added in the Govee app would never
+	// appear on its own. Failure is fine: the cached catalog stands.
+	go func() {
+		devices, err := client.RefreshDevices(context.Background())
+		if err != nil {
+			log.Warn("Startup device refresh failed (serving the cached catalog): %v", err)
+			return // cloud is down; warming scenes would only fail too
+		}
+		// Fill in scene catalogs for devices that have none cached. Gap-fill
+		// only, so this costs its calls once rather than on every restart.
+		client.WarmSceneCache(context.Background(), devices)
+	}()
 
 	// LAN Control fast path (optional; defaults on). Discovery is startup +
 	// bounded retries + manual Refresh + self-heal — never a polling timer.

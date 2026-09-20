@@ -156,11 +156,18 @@ type Client struct {
 	callsToday int
 	budgetDay  string // "2006-01-02" the counter belongs to
 
-	cacheMu     sync.RWMutex
-	devices     []Device
-	devicesFrom time.Time
-	cachePath   string             // on-disk catalog ("" = memory only); see devicecache.go
-	scenes      map[string][]Scene // device ID → scene catalog
+	// Circuit breaker state, guarded by mu. See breaker.go.
+	outageStreak   int
+	breakerUntil   time.Time
+	breakerProbing bool
+	breakerErr     error
+
+	cacheMu        sync.RWMutex
+	devices        []Device
+	devicesFrom    time.Time
+	cachePath      string                // on-disk catalog ("" = memory only); see devicecache.go
+	scenes         map[string]sceneEntry // device ID → scene catalog; see scenecache.go
+	sceneCachePath string                // on-disk scene catalogs ("" = memory only)
 
 	// lan is the optional fast path (nil = cloud-only). See transport.go.
 	lan *lanService
@@ -220,7 +227,18 @@ func (c *Client) spend() error {
 	return nil
 }
 
+// do performs a request, with the circuit breaker wrapped around it so a Govee
+// outage costs one timeout rather than one timeout per call. See breaker.go.
 func (c *Client) do(ctx context.Context, method, path string, body interface{}, out interface{}) error {
+	if err := c.breakerCheck(); err != nil {
+		return err
+	}
+	err := c.doRequest(ctx, method, path, body, out)
+	c.recordOutcome(err)
+	return err
+}
+
+func (c *Client) doRequest(ctx context.Context, method, path string, body interface{}, out interface{}) error {
 	if err := c.spend(); err != nil {
 		return err
 	}
@@ -253,13 +271,21 @@ func (c *Client) do(ctx context.Context, method, path string, body interface{}, 
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("govee request failed: %w", err)
+		// Never got an answer at all (timeout, connection refused, DNS).
+		return outageError{fmt.Errorf("govee request failed: %w", err)}
 	}
 	defer resp.Body.Close()
 
 	respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("govee returned status %d: %s", resp.StatusCode, string(respBody))
+		statusErr := fmt.Errorf("govee returned status %d: %s", resp.StatusCode, string(respBody))
+		// 5xx is Govee's own gateway failing. 4xx is Govee rejecting THIS
+		// request (bad key, bad parameter) — the cloud is fine, so it must
+		// not open the breaker.
+		if resp.StatusCode >= 500 {
+			return outageError{statusErr}
+		}
+		return statusErr
 	}
 
 	// Check Govee's OWN status code before decoding the typed payload.
@@ -306,7 +332,18 @@ func checkGoveeEnvelope(body []byte) error {
 	if msg == "" {
 		msg = "no message"
 	}
-	return fmt.Errorf("govee API error %d: %s", env.Code, msg)
+	apiErr := fmt.Errorf("govee API error %d: %s", env.Code, msg)
+
+	// "request error:" is Govee's gateway prefix for "I could not reach the
+	// service behind me" — the ConnectTimeoutException / ChannelException
+	// pair seen throughout the 2026-09-19 outage. It arrives as code 400 over
+	// HTTP 200, so the code alone cannot distinguish it from an ordinary
+	// parameter rejection; the prefix can, and this is the one function that
+	// reads Govee's wire format, so the string test belongs here.
+	if strings.HasPrefix(msg, "request error:") {
+		return outageError{apiErr}
+	}
+	return apiErr
 }
 
 // ListDevices returns the device list, from cache when available. Call
@@ -358,6 +395,11 @@ func (c *Client) CachedAt() time.Time {
 
 // RefreshDevices re-fetches the device list from Govee and updates the cache.
 func (c *Client) RefreshDevices(ctx context.Context) ([]Device, error) {
+	// The Refresh button is the operator explicitly asking the cloud, so it
+	// always reaches the network rather than getting an instant breaker
+	// rejection — and it is how you confirm an outage has ended.
+	c.clearBreaker()
+
 	var resp devicesResponse
 	if err := c.do(ctx, http.MethodGet, "/user/devices", nil, &resp); err != nil {
 		return nil, err
@@ -624,7 +666,7 @@ func (c *Client) ListScenes(ctx context.Context, sku, device string, refresh boo
 	cached, ok := c.scenes[device]
 	c.cacheMu.RUnlock()
 	if ok && !refresh {
-		return cached, nil
+		return cached.Scenes, nil
 	}
 
 	var scenes []Scene
@@ -661,10 +703,12 @@ func (c *Client) ListScenes(ctx context.Context, sku, device string, refresh boo
 
 	c.cacheMu.Lock()
 	if c.scenes == nil {
-		c.scenes = make(map[string][]Scene)
+		c.scenes = make(map[string]sceneEntry)
 	}
-	c.scenes[device] = scenes
+	c.scenes[device] = sceneEntry{SKU: sku, CachedAt: time.Now(), Scenes: scenes}
 	c.cacheMu.Unlock()
+
+	c.saveSceneCache()
 
 	c.log.Info("Scene catalog for %s: %d scenes", device, len(scenes))
 	return scenes, nil

@@ -91,8 +91,23 @@ class APIClient {
         return this.get('/api/v1/devices/status');
     }
 
-    async getSensors() {
-        return this.get('/api/v1/sensors');
+    // refresh=true bypasses the server's 5-minute sensor cache.
+    async getSensors(refresh) {
+        return this.get('/api/v1/sensors' + (refresh ? '?refresh=1' : ''));
+    }
+
+    // Health page snapshot (runtime, memory, GC, services). No Govee calls.
+    async getMetrics() {
+        return this.get('/api/v1/metrics');
+    }
+
+    async getPinnedSensor() {
+        return this.get('/api/v1/sensors/pinned');
+    }
+
+    // device = '' unpins (hides the Devices-page readout).
+    async setPinnedSensor(device) {
+        return this.put('/api/v1/sensors/pinned', { device: device });
     }
 
     async getDeviceState(device, sku) {

@@ -20,7 +20,7 @@ import (
 )
 
 // registerV1Routes registers all /api/v1 routes.
-func registerV1Routes(r chi.Router, cfgManager *config.Manager, client *govee.Client, engine *effects.Engine, act *activity.Log) {
+func registerV1Routes(r chi.Router, cfgManager *config.Manager, client *govee.Client, engine *effects.Engine, act *activity.Log, listener v1.ListenerStatus) {
 	// Public
 	r.Get("/health", v1.HandleHealth())
 	r.Post("/api/v1/auth/login", v1.HandleAuthLogin(cfgManager))
@@ -32,9 +32,15 @@ func registerV1Routes(r chi.Router, cfgManager *config.Manager, client *govee.Cl
 
 		r.Get("/api/v1/status", v1.HandleStatus())
 
+		// Health page: runtime, memory, GC and services (no Govee calls)
+		r.Get("/api/v1/metrics", v1.HandleMetrics(cfgManager, client, listener))
+
 		r.Get("/api/v1/devices", v1.HandleDevicesList(client, cfgManager))
 		r.Get("/api/v1/devices/status", v1.HandleDevicesStatus(client))
-		r.Get("/api/v1/sensors", v1.HandleSensors(client))
+		sensors := v1.NewSensors(client, cfgManager)
+		r.Get("/api/v1/sensors", sensors.HandleList())
+		r.Get("/api/v1/sensors/pinned", sensors.HandlePinnedGet())
+		r.Put("/api/v1/sensors/pinned", sensors.HandlePinnedSet())
 		r.Post("/api/v1/devices/refresh", v1.HandleDevicesRefresh(client, cfgManager))
 		r.Post("/api/v1/devices/{device}/test", v1.HandleDeviceTest(engine, cfgManager))
 		r.Get("/api/v1/devices/{device}/scenes", v1.HandleDeviceScenes(client))

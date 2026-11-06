@@ -32,10 +32,33 @@ import (
 )
 
 func main() {
+	// `mmfp-govee healthcheck` is what the Docker HEALTHCHECK runs (Ledger's
+	// pattern). It lives in the binary so it probes whichever ports config.json
+	// actually sets — a fixed port in the Dockerfile goes stale the moment
+	// webServerPort or webhookPort is changed.
+	if len(os.Args) > 1 && os.Args[1] == "healthcheck" {
+		os.Exit(healthcheck())
+	}
+
 	log := logger.New(logger.ModuleMain)
 	if err := run(); err != nil {
 		log.Fatal("FAILED TO START SERVER: %v", err)
 	}
+}
+
+// resolveBaseDir returns the directory holding config/ and logs/: the
+// executable's directory, or the working directory when ./config exists
+// (development).
+func resolveBaseDir() (string, error) {
+	execPath, err := os.Executable()
+	if err != nil {
+		return "", fmt.Errorf("failed to get executable path: %w", err)
+	}
+	baseDir := filepath.Dir(execPath)
+	if _, err := os.Stat("./config"); err == nil {
+		baseDir, _ = os.Getwd()
+	}
+	return baseDir, nil
 }
 
 func run() error {
@@ -43,16 +66,9 @@ func run() error {
 
 	log.Info("MMFP Govee v%s (built %s, commit %s)", version.Version, version.BuildDate, version.Commit)
 
-	// Determine paths
-	execPath, err := os.Executable()
+	baseDir, err := resolveBaseDir()
 	if err != nil {
-		return fmt.Errorf("failed to get executable path: %w", err)
-	}
-	baseDir := filepath.Dir(execPath)
-
-	// For development, use current directory
-	if _, err := os.Stat("./config"); err == nil {
-		baseDir, _ = os.Getwd()
+		return err
 	}
 
 	configDir := filepath.Join(baseDir, "config")
@@ -174,12 +190,14 @@ func run() error {
 		log.Info("Quiet hours: not configured")
 	}
 
-	// Webhook listener (:8787)
+	// Webhook listener (:8787). A bind failure does NOT stop the app: exiting
+	// would put `restart: always` into a loop against a port that stays held.
+	// It shows as "Not running" on the Health page and fails the healthcheck.
 	hookServer := hooks.NewServer(cfgManager, engine, act)
 	hookServer.Start(cfg.WebhookPort)
 
 	// Web app (:3008)
-	handler := router.SetupRouter(cfgManager, client, engine, act)
+	handler := router.SetupRouter(cfgManager, client, engine, act, hookServer)
 	server := &http.Server{
 		Addr:         fmt.Sprintf(":%d", cfg.WebServerPort),
 		Handler:      handler,
@@ -189,7 +207,9 @@ func run() error {
 	}
 
 	log.Info("Web app running on http://localhost:%d", cfg.WebServerPort)
-	log.Info("Webhook listener on :%d (POST /hook)", cfg.WebhookPort)
+	if hookServer.Running() {
+		log.Info("Webhook listener on :%d (POST /hook)", cfg.WebhookPort)
+	}
 
 	serverErr := make(chan error, 1)
 	go func() {

@@ -175,6 +175,17 @@ func SetupFileLoggingWithRotation(logToFile bool, logFilePath string, config Rot
 	return nil
 }
 
+// FilePath returns the log file actually opened, or "" when file logging is
+// off. The Health page reads its size from here, not from config: config
+// leaves logFilePath empty by default and main() fills in logs/mmfp-govee.log.
+// Set once at startup, before any request is served.
+func FilePath() string {
+	if globalRotationManager == nil {
+		return ""
+	}
+	return globalRotationManager.logFilePath
+}
+
 // startRotationChecker periodically checks if rotation is needed
 func (rm *rotationManager) startRotationChecker() {
 	ticker := time.NewTicker(1 * time.Minute)

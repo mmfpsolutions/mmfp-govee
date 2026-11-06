@@ -86,6 +86,49 @@
     border-color: rgba(51, 65, 85, 0.8);
 }
 
+/* ─── Health page (copied from MMFP Ledger, itself GSSM's) ─────────
+   .stat-card folds in Ledger's dark-theme.css override (white background
+   → dark card) since Govee's trimmed dark-theme.css has no such rule. */
+
+.stat-card {
+    background: rgba(30, 41, 59, 0.6);
+    border: 1px solid rgba(51, 65, 85, 0.5);
+    border-radius: 0.5rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    padding: 1.5rem;
+    transition: all 0.2s;
+}
+
+.stat-card:hover {
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.device-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid rgba(51, 65, 85, 0.4);
+    cursor: pointer;
+    user-select: none;
+}
+
+/* iOS/PWA touch reliability for the collapsible Health section headers
+   (MIM's fix, via GSSM/Ledger): no double-tap-zoom wait, no gray flash, and
+   the tap always lands on the header, never a child node. Scoped to the
+   toggle class — these headers hold only non-interactive spans. Pairs with
+   initSectionToggleHandler's touchend handling in utils.js; both are needed. */
+.metrics-section-toggle {
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+}
+.metrics-section-toggle * {
+    pointer-events: none;
+}
+
 /* Brand gradient text — mirrors .header-title (dark-theme.css) so card and
    page titles carry the same signature as the dashboard title. */
 .device-card-name {
@@ -202,6 +245,32 @@
     }
     .list-cols-devices .devices-col-model,
     .list-cols-devices .devices-col-id {
+        display: none;
+    }
+}
+
+/* ─── Sensors list columns ────────────────────────────────────────
+   Pin (star) | Status | Sensor Name | Model | Readings */
+.list-cols-sensors {
+    display: grid;
+    grid-template-columns:
+        40px                  /* Pin (star) */
+        80px                  /* Status */
+        minmax(140px, 1fr)    /* Sensor Name */
+        70px                  /* Model */
+        minmax(120px, auto);  /* Readings */
+}
+
+@media (max-width: 768px) {
+    /* Narrow screens: drop Model */
+    .list-cols-sensors {
+        grid-template-columns:
+            32px
+            70px
+            minmax(100px, 1fr)
+            minmax(90px, auto);
+    }
+    .list-cols-sensors .sensors-col-model {
         display: none;
     }
 }

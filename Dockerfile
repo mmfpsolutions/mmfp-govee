@@ -39,8 +39,9 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
 # Runtime stage
 FROM alpine:latest
 
-# Install runtime dependencies (su-exec for entrypoint user switching)
-RUN apk --no-cache add ca-certificates tzdata su-exec wget
+# Install runtime dependencies (su-exec for entrypoint user switching).
+# No wget/curl needed: the healthcheck is the binary's own subcommand.
+RUN apk --no-cache add ca-certificates tzdata su-exec
 
 # Create app user
 RUN addgroup -g 1000 app && \
@@ -61,9 +62,12 @@ RUN mkdir -p /app/config /app/logs && chown -R app:app /app/config /app/logs
 # Expose ports: web app + webhook listener
 EXPOSE 3008 8787
 
-# Health check (web app port)
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:3008/health || exit 1
+# Health check: `mmfp-govee healthcheck` reads webServerPort AND webhookPort
+# from config/config.json and GETs /health on both, so it follows the port
+# configuration. Healthy only when both listeners answer. The Govee cloud is
+# never part of it (an outage shows on the Health page instead).
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+  CMD ["./mmfp-govee", "healthcheck"]
 
 # Entrypoint fixes volume permissions then drops to app user
 ENTRYPOINT ["/app/docker-entrypoint.sh"]

@@ -1,0 +1,50 @@
+{{define "sensors-content"}}
+<div id="sensors-page">
+    <!-- Loading State -->
+    <div id="sensors-loading" class="text-center py-12">
+        <div class="spinner mx-auto mb-4"></div>
+        <p style="color: #94a3b8;">Reading Govee sensors...</p>
+    </div>
+
+    <!-- Error State -->
+    <div id="sensors-error" class="hidden max-w-2xl mx-auto mb-6 p-4 rounded-lg text-sm"
+         style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171;">
+    </div>
+
+    <!-- Content (width-capped like the Devices list) -->
+    <div id="sensors-content-inner" class="hidden max-w-3xl mx-auto">
+        <div class="mb-6">
+            <h1 class="text-2xl font-bold text-white">Sensors</h1>
+            <p class="text-sm mt-1" style="color: #94a3b8;">
+                <span id="sensors-age"></span>
+                <!-- Same icon-beside-timestamp pattern as the Devices page. This
+                     one really asks Govee again (refresh=1), bypassing the
+                     server's 5-minute cache. -->
+                <button id="sensors-refresh-btn" onclick="refreshSensors()"
+                        class="icon-refresh" title="Read sensors now" aria-label="Read sensors now">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                              d="M4 4v5h5M20 20v-5h-5M20 9a8 8 0 0 0-14.3-3.4L4 9m16 6-1.7 3.4A8 8 0 0 1 4 15"/>
+                    </svg>
+                </button>
+            </p>
+            <p id="sensors-pin-hint" class="text-xs mt-2" style="color: #64748b; display: none;">
+                Pin a sensor with &#9734; to show it on the Devices page.
+            </p>
+        </div>
+
+        <div class="list-header list-cols-sensors">
+            <div>Pin</div>
+            <div>Status</div>
+            <div>Sensor Name</div>
+            <div class="sensors-col-model">Model</div>
+            <div>Readings</div>
+        </div>
+        <div id="sensors-list" class="space-y-1"></div>
+
+        <p id="sensors-empty" class="text-center py-8" style="color: #94a3b8; display: none;">
+            No sensors in your Govee account.
+        </p>
+    </div>
+</div>
+{{end}}

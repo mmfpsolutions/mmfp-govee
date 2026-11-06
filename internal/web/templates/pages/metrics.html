@@ -1,0 +1,93 @@
+{{define "metrics-content"}}
+<div id="metrics-page">
+    <!-- Loading State -->
+    <div id="metrics-loading" class="text-center py-12">
+        <div class="spinner mx-auto mb-4"></div>
+        <p style="color: #94a3b8;">Loading health snapshot...</p>
+    </div>
+
+    <!-- Content -->
+    <div id="metrics-content-inner" class="hidden">
+        <!-- Header -->
+        <div class="text-center mb-6">
+            <div class="mb-2">
+                <a href="/devices" class="text-sm" style="color: #64748b; text-decoration: none;">&larr; Back to Devices</a>
+            </div>
+            <h1 class="text-2xl font-bold text-white"><span style="margin-right: 0.5rem;">&#128147;</span>Health &amp; Metrics</h1>
+            <p class="text-sm mt-1" style="color: #94a3b8;">Runtime and services snapshot — refresh the page to update</p>
+        </div>
+
+        <div class="max-w-5xl mx-auto">
+            <!-- Runtime tiles -->
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                <div class="stat-card">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="text-sm font-medium" style="color: #94a3b8;">Uptime</h3>
+                        <span class="text-lg" style="color: #fb923c;">&#9201;</span>
+                    </div>
+                    <div class="text-sm font-semibold leading-relaxed" id="m-uptime">--</div>
+                </div>
+                <div class="stat-card">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="text-sm font-medium" style="color: #94a3b8;">Goroutines</h3>
+                        <span class="text-lg" style="color: #60a5fa;">&#9881;</span>
+                    </div>
+                    <div class="text-sm font-semibold leading-relaxed" id="m-goroutines">--</div>
+                </div>
+                <div class="stat-card">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="text-sm font-medium" style="color: #94a3b8;">CPU Cores</h3>
+                        <span class="text-lg" style="color: #a78bfa;">&#9638;</span>
+                    </div>
+                    <div class="text-sm font-semibold leading-relaxed" id="m-cpu">--</div>
+                </div>
+                <div class="stat-card">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="text-sm font-medium" style="color: #94a3b8;">Go Runtime</h3>
+                        <span class="text-lg" style="color: #22c55e;">&#128640;</span>
+                    </div>
+                    <div class="text-sm font-semibold leading-relaxed" id="m-goversion">--</div>
+                </div>
+            </div>
+
+            <!-- Services (GSSM's card; always open). Every figure is Govee's own
+                 in-memory state: opening this page makes no Govee call. -->
+            <div class="device-card px-5 py-4 mb-4">
+                <div class="flex items-center space-x-3 mb-3">
+                    <span style="color: #38bdf8;">&#9881;</span>
+                    <span class="device-card-name">Services</span>
+                </div>
+                <div id="m-services" class="space-y-2"></div>
+            </div>
+
+            <!-- Memory (collapsible) -->
+            <div class="device-card mb-4" id="section-m-memory">
+                <div class="device-card-header metrics-section-toggle" data-section="m-memory" style="cursor: pointer;">
+                    <div class="flex items-center justify-between w-full">
+                        <div class="flex items-center space-x-3">
+                            <span style="color: #3b82f6;">&#129504;</span>
+                            <span class="device-card-name">Memory</span>
+                        </div>
+                        <span class="metrics-section-arrow text-xs transition-transform" style="color: #64748b;">&#9660;</span>
+                    </div>
+                </div>
+                <div class="device-card-body" id="body-m-memory"></div>
+            </div>
+
+            <!-- Garbage Collection (collapsible) -->
+            <div class="device-card mb-4" id="section-m-gc">
+                <div class="device-card-header metrics-section-toggle" data-section="m-gc" style="cursor: pointer;">
+                    <div class="flex items-center justify-between w-full">
+                        <div class="flex items-center space-x-3">
+                            <span style="color: #f59e0b;">&#9851;</span>
+                            <span class="device-card-name">Garbage Collection</span>
+                        </div>
+                        <span class="metrics-section-arrow text-xs transition-transform" style="color: #64748b;">&#9660;</span>
+                    </div>
+                </div>
+                <div class="device-card-body" id="body-m-gc"></div>
+            </div>
+        </div>
+    </div>
+</div>
+{{end}}

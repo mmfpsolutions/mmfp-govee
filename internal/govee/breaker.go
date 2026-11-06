@@ -50,6 +50,16 @@ func isOutage(err error) bool {
 	return errors.As(err, &oe)
 }
 
+// BreakerState reports the circuit breaker for the Health page, read-only:
+// whether it is open (Govee calls are being rejected without being made),
+// when the next recovery probe is due, and the outage error that opened it.
+// Reading it never starts a probe.
+func (c *Client) BreakerState() (open bool, until time.Time, lastErr error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return !c.breakerUntil.IsZero(), c.breakerUntil, c.breakerErr
+}
+
 // breakerCheck reports whether the call should be abandoned before it is made,
 // and starts a background recovery probe when the cooldown has lapsed.
 func (c *Client) breakerCheck() error {

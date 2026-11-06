@@ -8,8 +8,8 @@
  */
 
 // Package hooks is the webhook listener (:8787). It accepts generic-webhook
-// POSTs from GSS and GSSM, authenticates them by per-caller token, routes on
-// the event type found in the BODY (GSSM `event_type`, GSS `type`), and hands
+// POSTs from GSS, GSSM and MIM, authenticates them by per-caller token, routes
+// on the event type found in the BODY (GSSM/MIM `event_type`, GSS `type`), and hands
 // matched mappings to the effects engine. It responds immediately — effects
 // never run inline in the request (senders time out at 10s).
 package hooks
@@ -20,8 +20,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -42,14 +44,19 @@ const (
 	maxBodyBytes = 64 * 1024
 )
 
-// incomingPayload covers both sender shapes:
+// incomingPayload covers every sender shape:
 //   - GSSM FormatForGenericWebhook: event_type, entity, message, severity, ...
+//   - MIM FormatForGenericWebhook: GSSM's shape plus "source": "mim"
 //   - GSS GenericFormatter: subject, message, type, timestamp
 type incomingPayload struct {
-	EventType string `json:"event_type"` // GSSM
+	EventType string `json:"event_type"` // GSSM, MIM
 	Type      string `json:"type"`       // GSS
-	Entity    string `json:"entity"`     // GSSM only
+	Entity    string `json:"entity"`     // GSSM, MIM
+	Source    string `json:"source"`     // MIM only; GSSM sends none
 }
+
+// mimSource is the "source" value MIM puts in its generic webhook body.
+const mimSource = "mim"
 
 // Server is the webhook listener.
 type Server struct {
@@ -58,6 +65,8 @@ type Server struct {
 	act        *activity.Log
 	log        *logger.Logger
 	httpServer *http.Server
+	port       int
+	running    atomic.Bool
 }
 
 // NewServer creates the webhook listener (not yet started).
@@ -84,21 +93,40 @@ func (s *Server) Router() http.Handler {
 }
 
 // Start runs the listener on the configured webhook port.
+//
+// The port is bound HERE, synchronously, so Running() is the truth the moment
+// Start returns. A bind failure is logged and the app keeps running: exiting
+// would put `restart: always` into a loop against a port that stays held. The
+// failure is surfaced instead — "Not running" on the Health page, and the
+// Docker healthcheck (which probes this port) reports unhealthy.
 func (s *Server) Start(port int) {
+	s.port = port
 	s.httpServer = &http.Server{
-		Addr:         fmt.Sprintf(":%d", port),
 		Handler:      s.Router(),
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  60 * time.Second,
 	}
+	ln, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	if err != nil {
+		s.log.Error("Webhook listener NOT running — could not bind :%d: %v", port, err)
+		return
+	}
+	s.running.Store(true)
 	go func() {
 		s.log.Info("Webhook listener running on :%d", port)
-		if err := s.httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := s.httpServer.Serve(ln); err != nil && err != http.ErrServerClosed {
 			s.log.Error("Webhook listener failed: %v", err)
 		}
+		s.running.Store(false)
 	}()
 }
+
+// Running reports whether the listener is bound and serving.
+func (s *Server) Running() bool { return s.running.Load() }
+
+// Port is the port the listener was asked to bind.
+func (s *Server) Port() int { return s.port }
 
 // Stop gracefully shuts the listener down.
 func (s *Server) Stop(ctx context.Context) {
@@ -159,7 +187,12 @@ func (s *Server) handleHook(w http.ResponseWriter, r *http.Request) {
 			if err := json.Unmarshal(body, &p); err == nil {
 				switch {
 				case p.EventType != "":
+					// MIM shares GSSM's body shape; only its "source"
+					// field tells them apart.
 					source = "gssm"
+					if strings.EqualFold(p.Source, mimSource) {
+						source = "mim"
+					}
 					if event == "" {
 						event = p.EventType
 					}
@@ -176,7 +209,7 @@ func (s *Server) handleHook(w http.ResponseWriter, r *http.Request) {
 
 	if event == "" {
 		s.act.Add(activity.Record{TokenName: tokenName, Source: source, Event: "-", Result: "rejected"})
-		http.Error(w, "no event type: body must carry event_type (GSSM) or type (GSS), or use /hook/{event}", http.StatusBadRequest)
+		http.Error(w, "no event type: body must carry event_type (GSSM/MIM) or type (GSS), or use /hook/{event}", http.StatusBadRequest)
 		return
 	}
 
@@ -184,7 +217,7 @@ func (s *Server) handleHook(w http.ResponseWriter, r *http.Request) {
 
 	matched := s.dispatch(tokenName, source, event, entity)
 
-	// Test buttons: GSSM sends event_type "test"; GSS's Test uses "startup".
+	// Test buttons: GSSM and MIM send event_type "test"; GSS's Test uses "startup".
 	// A 200 keeps the sender's Test flow green whether or not a mapping is
 	// wired to the test event.
 	if matched == 0 {

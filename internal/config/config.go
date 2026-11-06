@@ -143,6 +143,13 @@ type Config struct {
 	// test blink — ends by re-applying this scene, unless the mapping's
 	// device ref carries its own afterScene override.
 	DeviceScenes map[string]*SceneRef `json:"deviceScenes,omitempty"`
+	// PinnedSensor is the one sensor shown in the Devices-page readout.
+	//   nil       never chosen — the Sensors handler auto-pins when exactly
+	//             one sensor reports a reading (the pool, on Scott's install)
+	//   ""        explicitly none — the readout is hidden
+	//   device ID that sensor
+	// A pointer so "never chosen" and "chose none" stay distinct.
+	PinnedSensor *string `json:"pinnedSensor,omitempty"`
 }
 
 // AfterSceneFor resolves the scene to apply after an effect on a device:

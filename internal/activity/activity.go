@@ -23,7 +23,7 @@ const ringSize = 200
 type Record struct {
 	Timestamp   time.Time `json:"timestamp"`
 	TokenName   string    `json:"tokenName"`
-	Source      string    `json:"source"` // "gss", "gssm", "unknown"
+	Source      string    `json:"source"` // "gss", "gssm", "mim", "unknown"
 	Event       string    `json:"event"`
 	Entity      string    `json:"entity,omitempty"`
 	MappingID   string    `json:"mappingId,omitempty"`

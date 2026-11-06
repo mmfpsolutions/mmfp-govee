@@ -64,7 +64,7 @@ function openTokenCreateModal() {
         '<div class="mb-4">' +
             '<label class="block text-sm mb-1.5" style="color: #94a3b8;">Name</label>' +
             '<input type="text" id="token-create-name" class="settings-input w-64" placeholder="gss-main">' +
-            '<p class="text-xs mt-1" style="color: #64748b;">One token per caller — e.g. gss-main, gssm-home.</p>' +
+            '<p class="text-xs mt-1" style="color: #64748b;">One token per caller — e.g. gss-main, gssm-home, mim-home.</p>' +
         '</div>' +
         '<div class="flex justify-end space-x-3">' +
             '<button onclick="closeTokenCreateModal()" class="px-4 py-2 rounded text-sm font-medium transition-colors" ' +
@@ -95,7 +95,7 @@ function createToken() {
     api.createToken(name).then(function(resp) {
         var secret = resp.data && resp.data.secret;
         var url = window.location.protocol + '//' + window.location.hostname + ':8787/hook';
-        // Show the secret ONCE with copy-paste GSS/GSSM setup instructions.
+        // Show the secret ONCE with copy-paste GSS/GSSM/MIM setup instructions.
         document.getElementById('token-create-modal-title').textContent = 'Token Created';
         document.getElementById('token-create-modal-content').innerHTML =
             '<p class="text-sm mb-3" style="color: #94a3b8;">Copy the secret now — it is shown <span class="text-white font-semibold">only once</span> and stored encrypted.</p>' +
@@ -104,7 +104,7 @@ function createToken() {
                 '<div class="text-sm text-white" style="font-family: monospace; word-break: break-all;" id="token-secret-value">' + escapeHtml(secret) + '</div>' +
             '</div>' +
             '<div class="mb-4 p-3 rounded-lg" style="background-color: #0f172a; border: 1px solid #475569;">' +
-                '<div class="text-xs mb-1" style="color: #64748b;">GSSM setup (its webhook form only takes a URL — token rides the URL)</div>' +
+                '<div class="text-xs mb-1" style="color: #64748b;">GSSM / MIM setup (token rides the URL)</div>' +
                 '<div class="text-xs" style="color: #94a3b8; font-family: monospace; word-break: break-all;">' +
                     escapeHtml(url) + '?token=' + escapeHtml(secret) +
                 '</div>' +
@@ -115,8 +115,8 @@ function createToken() {
                     'URL: ' + escapeHtml(url) + '<br>' +
                     'Header: X-MMFP-Token: ' + escapeHtml(secret) +
                 '</div>' +
-                '<p class="text-xs mt-2" style="color: #64748b;">Adjust the hostname/port if this machine is reached differently from your GSS/GSSM host.</p>' +
-                '<p class="text-xs mt-1" style="color: #64748b;">Note: the senders’ Test buttons emit fixed events — GSS sends <span style="font-family: monospace;">startup</span>, GSSM sends <span style="font-family: monospace;">test</span>. They return 200 here but only fire lights if a mapping includes that event. Use a mapping’s own Test button to preview its effect.</p>' +
+                '<p class="text-xs mt-2" style="color: #64748b;">Adjust the hostname/port if this machine is reached differently from your GSS/GSSM/MIM host.</p>' +
+                '<p class="text-xs mt-1" style="color: #64748b;">Note: the senders’ Test buttons emit fixed events — GSS sends <span style="font-family: monospace;">startup</span>, GSSM and MIM send <span style="font-family: monospace;">test</span>. They return 200 here but only fire lights if a mapping includes that event. Use a mapping’s own Test button to preview its effect.</p>' +
             '</div>' +
             '<div class="flex justify-end space-x-3">' +
                 '<button onclick="copyTokenSecret(this)" class="px-4 py-2 rounded text-sm font-medium transition-colors" ' +

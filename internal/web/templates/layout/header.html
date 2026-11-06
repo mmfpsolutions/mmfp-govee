@@ -15,6 +15,11 @@
                     <span class="tab-label">Devices</span>
                     <span class="tab-count" id="devices-count"></span>
                 </a>
+                <a href="/sensors"
+                   class="nav-tab {{if eq .ActivePage "sensors"}}active{{end}}"
+                   data-page="sensors">
+                    <span class="tab-label">Sensors</span>
+                </a>
                 <a href="/mappings"
                    class="nav-tab {{if eq .ActivePage "mappings"}}active{{end}}"
                    data-page="mappings">
@@ -68,6 +73,7 @@
         <div class="md:hidden mt-4" id="mobile-nav">
             <select id="mobile-page-selector" class="coin-selector-mobile" onchange="window.location.href=this.value">
                 <option value="/devices" {{if eq .ActivePage "devices"}}selected{{end}}>Devices</option>
+                <option value="/sensors" {{if eq .ActivePage "sensors"}}selected{{end}}>Sensors</option>
                 <option value="/mappings" {{if eq .ActivePage "mappings"}}selected{{end}}>Mappings</option>
                 <option value="/tokens" {{if eq .ActivePage "tokens"}}selected{{end}}>Tokens</option>
                 <option value="/activity" {{if eq .ActivePage "activity"}}selected{{end}}>Activity</option>

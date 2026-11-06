@@ -86,6 +86,16 @@ func isControllable(d govee.Device) bool {
 	return false // no capabilities at all, or read-only ones only
 }
 
+// isSensor reports whether this device belongs on the Sensors tab: a real
+// (non-group) device whose capabilities are all read-only.
+//
+// Defined as the complement of isControllable, so the Devices page and the
+// Sensors tab can never both claim a device or both drop it. A device with
+// one read-only and one control capability is controllable, not a sensor.
+func isSensor(d govee.Device) bool {
+	return !isGroup(d) && len(d.Capabilities) > 0 && !isControllable(d)
+}
+
 func toDeviceViews(devices []govee.Device, cfg *config.Config, lanRoutes map[string]govee.LANRoute) []deviceView {
 	views := make([]deviceView, 0, len(devices))
 	for _, d := range devices {

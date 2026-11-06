@@ -3,7 +3,7 @@
     <div class="flex items-center justify-between mb-6">
         <div>
             <h1 class="text-2xl font-bold text-white">Webhook Tokens</h1>
-            <p class="text-sm mt-1" style="color: #94a3b8;">Per-caller secrets for the webhook listener — one per GSS / GSSM instance</p>
+            <p class="text-sm mt-1" style="color: #94a3b8;">Per-caller secrets for the webhook listener — one per GSS / GSSM / MIM instance</p>
         </div>
         <button onclick="openTokenCreateModal()"
                 class="px-4 py-2 rounded text-sm font-medium transition-colors"
@@ -15,7 +15,7 @@
     <div id="tokens-list" class="max-w-3xl space-y-3"></div>
 
     <div id="tokens-empty" class="hidden max-w-3xl text-center py-12 device-card">
-        <p style="color: #94a3b8;">No tokens yet. Create one, then point a GSS or GSSM generic webhook at this listener.</p>
+        <p style="color: #94a3b8;">No tokens yet. Create one, then point a GSS, GSSM or MIM generic webhook at this listener.</p>
     </div>
 
     <!-- Create Token Modal -->

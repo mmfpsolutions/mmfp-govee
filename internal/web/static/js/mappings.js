@@ -14,10 +14,13 @@ var mappingsState = {
     mappings: [],
     tokens: [],
     devices: [],
-    eventCatalog: { gss: [], gssm: [] },
+    eventCatalog: { gss: [], gssm: [], mim: [] },
     editingId: null,      // null = creating
     selectedEvents: [],   // events checked in the editor
 };
+
+// Event-catalog sources, in picker order.
+var eventSources = ['gss', 'gssm', 'mim'];
 
 var effectPresets = {
     celebrate: { effect: 'flash', params: { colorA: 16756736, colorB: 65280, cycles: 5, delayMs: 700, brightness: 100, endState: 'holdB' } },
@@ -36,7 +39,7 @@ document.addEventListener('DOMContentLoaded', function() {
         mappingsState.mappings = (results[0].data && results[0].data.mappings) || [];
         mappingsState.tokens = (results[1].data && results[1].data.tokens) || [];
         mappingsState.devices = (results[2].data && results[2].data.devices) || [];
-        mappingsState.eventCatalog = results[3].data || { gss: [], gssm: [] };
+        mappingsState.eventCatalog = results[3].data || { gss: [], gssm: [], mim: [] };
         renderMappings();
     }).catch(function(err) {
         document.getElementById('mappings-loading').innerHTML =
@@ -192,7 +195,7 @@ function renderEventChecklist() {
     var catalog = mappingsState.eventCatalog;
     var html = '';
 
-    ['gss', 'gssm'].forEach(function(source) {
+    eventSources.forEach(function(source) {
         var events = catalog[source] || [];
         if (!events.length) return;
         html += '<div class="text-xs font-semibold uppercase mt-2 mb-1" style="color: #64748b;">' + source.toUpperCase() + '</div>';
@@ -207,7 +210,8 @@ function renderEventChecklist() {
     });
 
     // Custom events already selected but not in the catalog
-    var known = (catalog.gss || []).concat(catalog.gssm || []);
+    var known = [];
+    eventSources.forEach(function(source) { known = known.concat(catalog[source] || []); });
     var custom = mappingsState.selectedEvents.filter(function(e) { return known.indexOf(e) === -1; });
     if (custom.length) {
         html += '<div class="text-xs font-semibold uppercase mt-2 mb-1" style="color: #64748b;">Custom</div>';
@@ -219,6 +223,17 @@ function renderEventChecklist() {
     }
 
     box.innerHTML = html || '<p class="text-sm" style="color: #64748b;">No event catalog available.</p>';
+
+    // An event name can appear under several senders (system_startup is in
+    // both GSSM and MIM). Mappings match on the name alone, so every copy is
+    // one choice: keep them in step.
+    box.onchange = function(ev) {
+        var cb = ev.target;
+        if (!cb.classList || !cb.classList.contains('mapping-event-cb')) return;
+        box.querySelectorAll('.mapping-event-cb').forEach(function(other) {
+            if (other.value === cb.value) other.checked = cb.checked;
+        });
+    };
 }
 
 function addCustomEvent() {
@@ -236,7 +251,7 @@ function addCustomEvent() {
 function syncSelectedEvents() {
     var checked = [];
     document.querySelectorAll('.mapping-event-cb:checked').forEach(function(cb) {
-        checked.push(cb.value);
+        if (checked.indexOf(cb.value) === -1) checked.push(cb.value);
     });
     mappingsState.selectedEvents = checked;
 }

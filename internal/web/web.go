@@ -89,6 +89,7 @@ func RegisterRoutes(r chi.Router, cfgManager *config.Manager) error {
 
 		r.Get("/", servePage("devices"))
 		r.Get("/devices", servePage("devices"))
+		r.Get("/sensors", servePage("sensors"))
 		r.Get("/devices/{device}/details", func(w http.ResponseWriter, r *http.Request) {
 			// chi returns the still-escaped segment; the page re-encodes for
 			// API calls, so hand it the decoded ID.
@@ -115,6 +116,7 @@ func RegisterRoutes(r chi.Router, cfgManager *config.Manager) error {
 		r.Get("/tokens", servePage("tokens"))
 		r.Get("/activity", servePage("activity"))
 		r.Get("/settings", servePage("settings"))
+		r.Get("/metrics", servePage("metrics"))
 	})
 
 	return nil

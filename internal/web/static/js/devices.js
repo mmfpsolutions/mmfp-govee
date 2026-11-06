@@ -26,7 +26,7 @@ function loadDevices(refresh) {
     call.then(function(resp) {
         renderDevices(resp.data || {});
         // Sensors load AFTER the sweep resolves, never alongside it. The
-        // power icons are what the page is for; the pool temperature is a
+        // power icons are what the page is for; the pinned sensor is a
         // bonus and must not compete with them for the Govee client's global
         // call spacing.
         loadStatuses().then(loadSensors);
@@ -158,53 +158,41 @@ function renderDevices(data) {
     }).join('');
 }
 
-// ── Sensor readout (read-only devices: no control row, just a value) ──
+// ── Pinned sensor readout (one sensor, chosen on the Sensors tab) ──
 
-// Temperatures come back as a bare number — Govee sends no unit field in
-// either the capability declaration or the state payload, and converts to
-// whatever the Govee account is set to. Assumed °F.
+// Shows only the PINNED sensor; every sensor lives on the Sensors tab. The
+// readout links there. Hidden when nothing is pinned.
 function loadSensors() {
     // Returns the promise so the Fetch spinner can wait on it too.
-    return api.getSensors().then(function(resp) {
-        var sensors = (resp.data && resp.data.sensors) || [];
+    return api.getPinnedSensor().then(function(resp) {
+        var s = resp.data && resp.data.sensor;
         var box = document.getElementById('devices-sensors');
         if (!box) return;
-        if (!sensors.length) {
+        if (!s) {
             box.style.display = 'none';
             return;
         }
-        var age = sensorAgeLabel(resp.data && resp.data.ageSecs);
-        box.innerHTML = sensors.map(function(s) {
-            var value = s.online ? s.value.toFixed(1) + '&deg;F' : '--';
-            return '<span class="text-sm" style="color: #94a3b8;" title="' +
-                escapeHtml(s.deviceName) + '">' +
-                escapeHtml(shortSensorName(s.deviceName)) +
-                ' <span style="color: #e2e8f0; font-weight: 600;">' + value + '</span>' +
-                (age ? ' <span class="text-xs" style="color: #64748b;">(' + age + ')</span>' : '') +
-                '</span>';
-        }).join('');
+        var value = (s.online && s.readings.length)
+            ? formatSensorReadings(s.readings, '#e2e8f0')
+            : '<span style="color: #e2e8f0; font-weight: 600;">--</span>';
+        var age = sensorAgeLabel(s.ageSecs);
+        box.innerHTML = '<a href="/sensors" class="text-sm hover:underline" style="color: #94a3b8;" title="' +
+            escapeHtml(s.deviceName) + ' — all sensors">' +
+            escapeHtml(shortSensorName(s.deviceName)) + ' ' + value +
+            (age ? ' <span class="text-xs" style="color: #64748b;">(' + age + ')</span>' : '') +
+            '</a>';
         box.style.display = 'flex';
     }).catch(function(err) {
         console.error('Sensor read failed:', err.message);
     });
 }
 
-// How long ago the server actually asked Govee for this reading. The value is
-// served from a 5-minute cache, so without this a temperature that is minutes
-// stale looks live. Rendered from the server's age, not a browser clock, so a
-// wrong client time can't make a fresh reading look old.
-function sensorAgeLabel(secs) {
-    if (typeof secs !== 'number' || secs < 0) return '';
-    if (secs < 60) return 'just now';
-    if (secs < 3600) return Math.floor(secs / 60) + 'm ago';
-    return Math.floor(secs / 3600) + 'h ago';
-}
-
-// "Pool Thermometer" → "Pool". The device name is already in the tooltip, and
-// the header has room for a value, not a sentence.
+// "Pool Thermometer" → "Pool", "Garage Thermo-Hygrometer" → "Garage". The
+// device name is already in the tooltip, and the header has room for a value,
+// not a sentence.
 function shortSensorName(name) {
     return String(name)
-        .replace(/\s*(thermometer|sensor|monitor|detector)\b.*$/i, '')
+        .replace(/\s*(thermo-hygrometer|hygrometer|thermometer|sensor|monitor|detector)\b.*$/i, '')
         .trim() || name;
 }
 

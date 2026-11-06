@@ -64,8 +64,11 @@ const (
 	// backend converts to the Govee account's unit, so this follows the app
 	// setting rather than being fixed. Treated as °F.
 	InstSensorTemperature = "sensorTemperature"
-	CapEvent              = "devices.capabilities.event"
-	CapOnline             = "devices.capabilities.online"
+	// Expected on the H5179 Thermo-Hygrometer. NOT yet verified against a
+	// live device — the Sensors tab renders whatever value shape arrives.
+	InstSensorHumidity = "sensorHumidity"
+	CapEvent           = "devices.capabilities.event"
+	CapOnline          = "devices.capabilities.online"
 )
 
 // Device is one entry from GET /user/devices.

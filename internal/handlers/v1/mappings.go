@@ -125,6 +125,10 @@ func cloneConfig(cfg *config.Config) *config.Config {
 	for k, v := range cfg.DeviceScenes {
 		clone.DeviceScenes[k] = v
 	}
+	if cfg.PinnedSensor != nil {
+		pinned := *cfg.PinnedSensor
+		clone.PinnedSensor = &pinned
+	}
 	return &clone
 }
 
@@ -262,7 +266,7 @@ func HandleMappingTest(cfgManager *config.Manager, engine *effects.Engine) http.
 	}
 }
 
-// HandleEventCatalog handles GET /api/v1/events — the known GSS/GSSM event
+// HandleEventCatalog handles GET /api/v1/events — the known GSS/GSSM/MIM event
 // types for the mapping editor's picker (free text is still allowed).
 func HandleEventCatalog() http.HandlerFunc {
 	catalog := map[string][]string{
@@ -281,6 +285,12 @@ func HandleEventCatalog() http.HandlerFunc {
 			"miner_fan_emergency", "miner_fan_emergency_off",
 			"pool_offline", "pool_online",
 			"node_offline", "node_online",
+			"system_startup", "system_shutdown", "test",
+		},
+		// MIM's EventType constants (mim internal/notifications/events.go).
+		"mim": {
+			"host_down", "host_up",
+			"os_updates_available",
 			"system_startup", "system_shutdown", "test",
 		},
 	}

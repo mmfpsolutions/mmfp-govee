@@ -113,36 +113,43 @@ func TestWorthStatusRead(t *testing.T) {
 	}
 }
 
-// The sensor readout and the control list are deliberately different
-// surfaces: a device that reports a temperature but commands nothing gets a
-// readout and NO control row.
-func TestIsTemperatureSensor(t *testing.T) {
+// The Sensors tab and the control list are deliberately different surfaces:
+// a device that reports a reading but commands nothing gets a sensor row and
+// NO control row, and nothing lands on both or on neither.
+func TestIsSensor(t *testing.T) {
 	thermometer := govee.Device{SKU: "H5310", DeviceName: "Pool Thermometer",
 		Capabilities: []govee.Capability{{Type: govee.CapProperty, Instance: govee.InstSensorTemperature}}}
 	leak := govee.Device{SKU: "H5059", DeviceName: "Attic Leak Detector-1",
 		Capabilities: []govee.Capability{{Type: govee.CapEvent, Instance: "bodyAppearedEvent"}}}
 	lamp := govee.Device{SKU: "H607C", DeviceName: "Den Floor Lamp",
 		Capabilities: []govee.Capability{{Type: govee.CapOnOff, Instance: govee.InstPower}}}
+	mixed := govee.Device{SKU: "H7000", DeviceName: "Reads and switches",
+		Capabilities: []govee.Capability{
+			{Type: govee.CapProperty, Instance: govee.InstSensorTemperature},
+			{Type: govee.CapOnOff, Instance: govee.InstPower},
+		}}
+	group := govee.Device{SKU: "SameModeGroup", DeviceName: "Den group"}
+	bare := govee.Device{SKU: "H0000", DeviceName: "No capabilities"}
 
-	if !isTemperatureSensor(thermometer) {
-		t.Error("thermometer not recognised as a temperature sensor")
-	}
-	if isTemperatureSensor(leak) {
-		t.Error("leak detector reports no temperature; it must not appear in the readout")
-	}
-	if isTemperatureSensor(lamp) {
-		t.Error("lamp is not a sensor")
-	}
-
-	// The two surfaces must not overlap: nothing in the readout gets a
-	// control row, and nothing controllable gets swept as a sensor.
-	if isControllable(thermometer) {
-		t.Error("thermometer would get a dashboard control row")
+	for _, tt := range []struct {
+		d                    govee.Device
+		sensor, controllable bool
+	}{
+		{thermometer, true, false},
+		{leak, true, false},
+		{lamp, false, true},
+		{mixed, false, true}, // stays on the Devices page
+		{group, false, false},
+		{bare, false, false},
+	} {
+		if got := isSensor(tt.d); got != tt.sensor {
+			t.Errorf("%s: isSensor = %v, want %v", tt.d.DeviceName, got, tt.sensor)
+		}
+		if got := isControllable(tt.d); got != tt.controllable {
+			t.Errorf("%s: isControllable = %v, want %v", tt.d.DeviceName, got, tt.controllable)
+		}
 	}
 	if worthStatusRead(thermometer) {
 		t.Error("thermometer would be swept for power state it cannot report")
-	}
-	if isTemperatureSensor(lamp) || !isControllable(lamp) {
-		t.Error("lamp landed on the wrong surface")
 	}
 }

@@ -34,6 +34,8 @@
             {{block "devices-content" .}}{{end}}
         {{else if eq .ActivePage "device-detail"}}
             {{block "device-detail-content" .}}{{end}}
+        {{else if eq .ActivePage "sensors"}}
+            {{block "sensors-content" .}}{{end}}
         {{else if eq .ActivePage "mappings"}}
             {{block "mappings-content" .}}{{end}}
         {{else if eq .ActivePage "tokens"}}
@@ -42,6 +44,8 @@
             {{block "activity-content" .}}{{end}}
         {{else if eq .ActivePage "settings"}}
             {{block "settings-content" .}}{{end}}
+        {{else if eq .ActivePage "metrics"}}
+            {{block "metrics-content" .}}{{end}}
         {{end}}
     </main>
 
@@ -61,6 +65,8 @@
     {{else if eq .ActivePage "device-detail"}}
     <script>window.GOVEE_DEVICE_ID = {{.DeviceID}};</script>
     <script src="/static/js/device-detail.js"></script>
+    {{else if eq .ActivePage "sensors"}}
+    <script src="/static/js/sensors.js"></script>
     {{else if eq .ActivePage "mappings"}}
     <script src="/static/js/mappings.js"></script>
     {{else if eq .ActivePage "tokens"}}
@@ -69,6 +75,8 @@
     <script src="/static/js/activity.js"></script>
     {{else if eq .ActivePage "settings"}}
     <script src="/static/js/settings.js"></script>
+    {{else if eq .ActivePage "metrics"}}
+    <script src="/static/js/metrics.js"></script>
     {{end}}
     {{end}}
 </body>

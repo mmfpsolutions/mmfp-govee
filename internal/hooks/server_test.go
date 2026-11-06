@@ -11,6 +11,8 @@ package hooks
 
 import (
 	"context"
+	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -162,6 +164,78 @@ func TestHook_GSSMPayloadRoutesOnEventType(t *testing.T) {
 	}
 }
 
+// lastSource is the Source on the newest activity record.
+func lastSource(t *testing.T) string {
+	t.Helper()
+	recent := activity.GetLog().Recent(1)
+	if len(recent) == 0 {
+		t.Fatal("no activity recorded")
+	}
+	return recent[0].Source
+}
+
+// MIM sends GSSM's body shape plus "source": "mim"; only that field tells
+// them apart. Unmatched events are used so the handler records the source
+// synchronously.
+func TestHook_SourceDetection(t *testing.T) {
+	cases := []struct {
+		name, body, want string
+	}{
+		{"gssm (no source field)",
+			`{"event_type":"pool_offline","entity":"Pool A","message":"offline","severity":"critical","category":"pool","details":{},"timestamp":"2026-11-06T15:04:05Z"}`,
+			"gssm"},
+		{"mim",
+			`{"source":"mim","event_type":"host_down","entity":"ubs1","message":"Host ubs1 is unreachable","severity":"critical","category":"hosts","details":{},"timestamp":"2026-11-06T15:04:05Z"}`,
+			"mim"},
+		{"mim test button",
+			`{"source":"mim","event_type":"test","entity":"MIM","message":"This is a test notification from MIM.","severity":"info","category":"system","details":{"note":"test event; no host is affected"},"timestamp":"2026-11-06T15:04:05Z"}`,
+			"mim"},
+		{"gss",
+			`{"subject":"Startup","message":"GSS started","type":"shutdown","timestamp":"2026-11-06T15:04:05Z"}`,
+			"gss"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			srv, _ := newTestServer(t)
+			rec := doRequest(t, srv, "POST", "/hook", "secret-1", tc.body)
+			if rec.Code != http.StatusAccepted && rec.Code != http.StatusOK {
+				t.Fatalf("status = %d (body: %s)", rec.Code, rec.Body.String())
+			}
+			if got := lastSource(t); got != tc.want {
+				t.Errorf("source = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+// A MIM event routes on event_type and its host name feeds the entity filter.
+func TestHook_MIMPayloadRoutesOnEventType(t *testing.T) {
+	srv, mgr := newTestServer(t)
+	cfg := mgr.GetConfig()
+	cfg.Mappings = append(cfg.Mappings, config.Mapping{
+		ID: "map3", Name: "ubs1 down", Token: "*",
+		Events:       []string{"host_down"},
+		EntityFilter: "ubs1",
+		Devices:      []config.DeviceRef{{SKU: "H1", Device: "EE:FF"}},
+		Effect:       "off", Params: config.EffectParams{},
+		CooldownSeconds: 0, Enabled: true,
+	})
+	if err := mgr.Save(cfg); err != nil {
+		t.Fatal(err)
+	}
+
+	rec := doRequest(t, srv, "POST", "/hook", "secret-1",
+		`{"source":"mim","event_type":"host_down","entity":"ubs1","message":"down","severity":"critical","category":"hosts","details":{},"timestamp":"2026-11-06T15:04:05Z"}`)
+	if !strings.Contains(rec.Body.String(), "queued 1") {
+		t.Errorf("ubs1: body = %q, want queued 1", rec.Body.String())
+	}
+	rec = doRequest(t, srv, "POST", "/hook", "secret-1",
+		`{"source":"mim","event_type":"host_down","entity":"ubs2","message":"down"}`)
+	if !strings.Contains(rec.Body.String(), "no mapping") {
+		t.Errorf("ubs2: body = %q, want no mapping", rec.Body.String())
+	}
+}
+
 func TestHook_EntityFilterExcludes(t *testing.T) {
 	srv, _ := newTestServer(t)
 	rec := doRequest(t, srv, "POST", "/hook", "secret-1",
@@ -249,4 +323,52 @@ func TestMain(m *testing.M) {
 	code := m.Run()
 	os.RemoveAll(filepath.Join(dir))
 	os.Exit(code)
+}
+
+// A webhook port that cannot be bound leaves the app running (no restart
+// loop) but must REPORT not running, so the Health page and the Docker
+// healthcheck can say so.
+func TestStart_BindFailureReportsNotRunning(t *testing.T) {
+	// Hold the WILDCARD address, as a real conflicting process on :8787
+	// would. (macOS lets a wildcard bind coexist with a 127.0.0.1 one.)
+	held, err := net.Listen("tcp", ":0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer held.Close()
+	port := held.Addr().(*net.TCPAddr).Port
+
+	srv, _ := newTestServer(t)
+	srv.Start(port)
+	defer srv.Stop(context.Background())
+	if srv.Running() {
+		t.Fatalf("port %d is held, yet Running() = true", port)
+	}
+	if srv.Port() != port {
+		t.Errorf("Port() = %d, want %d", srv.Port(), port)
+	}
+}
+
+func TestStart_BindsAndServesHealth(t *testing.T) {
+	probe, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	port := probe.Addr().(*net.TCPAddr).Port
+	probe.Close()
+
+	srv, _ := newTestServer(t)
+	srv.Start(port)
+	defer srv.Stop(context.Background())
+	if !srv.Running() {
+		t.Fatal("free port, yet Running() = false")
+	}
+	resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%d/health", port))
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("GET /health = %d", resp.StatusCode)
+	}
 }

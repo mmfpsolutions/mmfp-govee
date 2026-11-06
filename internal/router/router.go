@@ -18,6 +18,7 @@ import (
 	"github.com/mmfpsolutions/mmfp-govee/internal/config"
 	"github.com/mmfpsolutions/mmfp-govee/internal/effects"
 	"github.com/mmfpsolutions/mmfp-govee/internal/govee"
+	v1 "github.com/mmfpsolutions/mmfp-govee/internal/handlers/v1"
 	"github.com/mmfpsolutions/mmfp-govee/internal/logger"
 	"github.com/mmfpsolutions/mmfp-govee/internal/middleware"
 	"github.com/mmfpsolutions/mmfp-govee/internal/web"
@@ -47,7 +48,7 @@ func setupRedirectMiddleware(cfgManager *config.Manager) func(http.Handler) http
 
 // SetupRouter configures all routes for the web application (:3008).
 // The webhook listener (:8787) has its own router in internal/hooks.
-func SetupRouter(cfgManager *config.Manager, client *govee.Client, engine *effects.Engine, act *activity.Log) http.Handler {
+func SetupRouter(cfgManager *config.Manager, client *govee.Client, engine *effects.Engine, act *activity.Log, listener v1.ListenerStatus) http.Handler {
 	r := chi.NewRouter()
 
 	// Global middleware
@@ -62,7 +63,7 @@ func SetupRouter(cfgManager *config.Manager, client *govee.Client, engine *effec
 	}
 
 	// Register API v1 routes
-	registerV1Routes(r, cfgManager, client, engine, act)
+	registerV1Routes(r, cfgManager, client, engine, act, listener)
 
 	return r
 }

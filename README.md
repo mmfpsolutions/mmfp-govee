@@ -4,7 +4,9 @@ MMFP Govee Webhook listener and General Govee tool — turn GoSlimStratum (GSS) 
 notification webhooks into Govee light effects. Flash the ceiling fan light green/gold five times
 when a block is found, hold a lamp red while a miner is offline, switch it back when it recovers.
 
-An MMFP Solutions product. Open source under GPLv3 (see [LICENSE](LICENSE)).
+An MMFP Solutions product. Open source under the MIT License (see [LICENSE](LICENSE)); releases
+before 0.1.1 were published under GPLv3. The MMFP Solutions name and logo are not covered by the
+license.
 
 ## How it works
 

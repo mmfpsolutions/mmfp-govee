@@ -61,8 +61,8 @@ const (
 	// backend converts to the Govee account's unit, so this follows the app
 	// setting rather than being fixed. Treated as °F.
 	InstSensorTemperature = "sensorTemperature"
-	// Expected on the H5179 Thermo-Hygrometer. NOT yet verified against a
-	// live device — the Sensors tab renders whatever value shape arrives.
+	// H5179 Thermo-Hygrometer. Verified live 2026-11-09: a bare number
+	// (46.3), percent, alongside sensorTemperature on the same device.
 	InstSensorHumidity = "sensorHumidity"
 	CapEvent           = "devices.capabilities.event"
 	CapOnline          = "devices.capabilities.online"

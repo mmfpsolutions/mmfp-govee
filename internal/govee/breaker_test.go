@@ -234,6 +234,80 @@ func TestBreaker_BackgroundProbeRecoversAndRefreshesCatalog(t *testing.T) {
 	}
 }
 
+// The 2026-11-19 bug: a blip opened the breaker, then nothing called the
+// cloud for two hours (effects go over LAN). Probing only on a caller left
+// the breaker open the whole time, and the first call after the quiet spell,
+// an after-effect scene, was refused although Govee had long recovered. The
+// breaker must re-check on its own and close with NO traffic at all.
+func TestBreaker_ClosesOnItsOwnWithNoTraffic(t *testing.T) {
+	var healthy atomic.Bool
+	var hits int32
+	client, srv := newTestClient(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&hits, 1)
+		if healthy.Load() {
+			w.Write([]byte(oneDeviceBody))
+			return
+		}
+		w.Write([]byte(outageBody))
+	})
+	defer srv.Close()
+	client.cooldownFor = 50 * time.Millisecond
+
+	for i := 0; i < breakerThreshold; i++ {
+		_ = client.do(context.Background(), http.MethodGet, "/user/devices", nil, nil)
+	}
+	if open, _, _ := client.BreakerState(); !open {
+		t.Fatal("breaker should be open after the threshold")
+	}
+
+	// Still failing: the timer keeps probing on its own (no caller), and the
+	// breaker stays open.
+	waitFor(t, func() bool { return atomic.LoadInt32(&hits) >= breakerThreshold+2 },
+		"at least two timed probes while the cloud is still down")
+	if open, _, _ := client.BreakerState(); !open {
+		t.Fatal("a failed timed probe closed the breaker")
+	}
+
+	// Govee recovers. Still no caller: the next timed probe must close it.
+	healthy.Store(true)
+	waitFor(t, func() bool { open, _, _ := client.BreakerState(); return !open },
+		"breaker to close on its own after recovery, with no traffic")
+
+	// Once closed, the timer is gone: no more probes.
+	settled := atomic.LoadInt32(&hits)
+	time.Sleep(5 * client.cooldownFor)
+	if got := atomic.LoadInt32(&hits); got != settled {
+		t.Errorf("probes kept firing after the breaker closed: %d extra calls", got-settled)
+	}
+
+	// And the first real call after the quiet spell goes through.
+	if err := client.do(context.Background(), http.MethodGet, "/user/devices", nil, nil); err != nil {
+		t.Errorf("first call after recovery was refused: %v", err)
+	}
+}
+
+// The Refresh button clears the breaker; that must also cancel the timer, or
+// a stale probe would fire into a closed breaker.
+func TestBreaker_ClearCancelsTimedProbe(t *testing.T) {
+	var hits int32
+	client, srv := newTestClient(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&hits, 1)
+		w.Write([]byte(outageBody))
+	})
+	defer srv.Close()
+	client.cooldownFor = 50 * time.Millisecond
+
+	for i := 0; i < breakerThreshold; i++ {
+		_ = client.do(context.Background(), http.MethodGet, "/user/devices", nil, nil)
+	}
+	client.clearBreaker()
+	before := atomic.LoadInt32(&hits)
+	time.Sleep(5 * client.cooldownFor)
+	if got := atomic.LoadInt32(&hits); got != before {
+		t.Errorf("a timed probe fired after clearBreaker: %d calls", got-before)
+	}
+}
+
 func waitFor(t *testing.T, cond func() bool, what string) {
 	t.Helper()
 	deadline := time.Now().Add(5 * time.Second)

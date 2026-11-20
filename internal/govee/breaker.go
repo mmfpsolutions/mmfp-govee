@@ -26,6 +26,17 @@ import (
 // is not answering," there is no information left in making the next caller
 // wait 10s to learn the same thing. The breaker fails those calls instantly
 // and probes for recovery in the BACKGROUND.
+//
+// The probe runs on a TIMER, not only when a call arrives (2026-11-19). The
+// first version probed only when some caller hit an expired cooldown — so
+// after a blip followed by a quiet spell (effects go over LAN; nobody had the
+// UI open) the breaker sat open for HOURS after Govee recovered. The next
+// cloud call, typically an after-effect scene, was then refused while its own
+// probe succeeded the same second ("effect failed: after-effect scene
+// 'Sunset': govee cloud unreachable", next to "reachable again", 19:20:15),
+// quoting a two-hour-old error. Now the breaker re-checks every cooldown on
+// its own and closes within one cooldown of Govee recovering. A refusal
+// therefore means Govee failed within the last minute.
 const (
 	breakerThreshold = 3
 	breakerCooldown  = 60 * time.Second
@@ -57,6 +68,50 @@ func (c *Client) BreakerState() (open bool, until time.Time, lastErr error) {
 	return !c.breakerUntil.IsZero(), c.breakerUntil, c.breakerErr
 }
 
+// cooldown is how long the breaker stays open between probes.
+func (c *Client) cooldown() time.Duration {
+	if c.cooldownFor > 0 {
+		return c.cooldownFor
+	}
+	return breakerCooldown
+}
+
+// scheduleProbeLocked arms the timer for the next recovery probe, one
+// cooldown from now, replacing any timer already set. Caller holds c.mu.
+func (c *Client) scheduleProbeLocked() {
+	if c.breakerTimer != nil {
+		c.breakerTimer.Stop()
+	}
+	c.breakerTimer = time.AfterFunc(c.cooldown(), c.timedProbe)
+}
+
+// stopProbeLocked cancels the scheduled probe (the breaker closed). Caller
+// holds c.mu.
+func (c *Client) stopProbeLocked() {
+	if c.breakerTimer != nil {
+		c.breakerTimer.Stop()
+		c.breakerTimer = nil
+	}
+}
+
+// timedProbe is the scheduled recovery check. It does nothing if the breaker
+// has closed meanwhile or a probe is already in flight. A failed probe
+// re-arms the timer through recordOutcome; a successful one closes the
+// breaker.
+func (c *Client) timedProbe() {
+	c.mu.Lock()
+	if c.breakerUntil.IsZero() || c.breakerProbing {
+		c.mu.Unlock()
+		return
+	}
+	c.breakerProbing = true
+	// Keep rejecting callers while the probe is in flight.
+	c.breakerUntil = time.Now().Add(c.cooldown())
+	c.mu.Unlock()
+
+	c.probeRecovery()
+}
+
 // breakerCheck reports whether the call should be abandoned before it is made,
 // and starts a background recovery probe when the cooldown has lapsed.
 func (c *Client) breakerCheck() error {
@@ -69,13 +124,14 @@ func (c *Client) breakerCheck() error {
 	// The probe runs in the BACKGROUND and the caller is still rejected. A
 	// synchronous half-open probe would hand one unlucky page load the full
 	// 10s stall once per cooldown — the exact symptom the breaker exists to
-	// remove. Recovery is still noticed within one cooldown; nobody waits for
-	// it.
+	// remove. The timer (timedProbe) normally gets there first; this is the
+	// fallback should a caller arrive after an expired cooldown with no probe
+	// in flight.
 	startProbe := !c.breakerProbing && time.Now().After(c.breakerUntil)
 	if startProbe {
 		c.breakerProbing = true
 		// Keep rejecting while the probe is in flight.
-		c.breakerUntil = time.Now().Add(breakerCooldown)
+		c.breakerUntil = time.Now().Add(c.cooldown())
 	}
 	until, lastErr := c.breakerUntil, c.breakerErr
 	c.mu.Unlock()
@@ -132,13 +188,16 @@ func (c *Client) recordOutcome(err error) {
 		c.outageStreak = 0
 		c.breakerUntil = time.Time{}
 		c.breakerErr = nil
+		c.stopProbeLocked()
 		return
 	}
 
 	c.outageStreak++
 	c.breakerErr = err
 	if c.outageStreak >= breakerThreshold {
-		c.breakerUntil = time.Now().Add(breakerCooldown)
+		c.breakerUntil = time.Now().Add(c.cooldown())
+		// Re-check on our own, whether or not any call comes along.
+		c.scheduleProbeLocked()
 	}
 }
 
@@ -151,5 +210,6 @@ func (c *Client) clearBreaker() {
 	c.breakerUntil = time.Time{}
 	c.breakerProbing = false
 	c.breakerErr = nil
+	c.stopProbeLocked()
 	c.mu.Unlock()
 }

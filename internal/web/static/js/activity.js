@@ -56,6 +56,39 @@ function resultColor(result) {
     return '#94a3b8';
 }
 
+// The Result column shows the short form; the full message goes in the
+// tooltip. Failures read "effect failed: <what>: <cause chain…>", and the
+// cause chain (wrapped Go errors with URLs and timeouts) is what blew the
+// column out. Cut at the SECOND ": " outside double quotes:
+//   effect failed: after-effect scene "Sunset": govee cloud unreachable, …
+//   → effect failed: after-effect scene "Sunset"
+// Quote-aware so a scene named "Sunset: Beach" isn't cut mid-name. A result
+// with nothing after its first part ("effect ok", "effect failed: device did
+// not respond") renders as-is, with no tooltip.
+function shortResult(result) {
+    var s = String(result || '');
+    var inQuote = false, seps = 0;
+    for (var i = 0; i < s.length - 1; i++) {
+        var ch = s.charAt(i);
+        if (ch === '"') inQuote = !inQuote;
+        else if (!inQuote && ch === ':' && s.charAt(i + 1) === ' ') {
+            if (++seps === 2) return s.slice(0, i);
+        }
+    }
+    return s;
+}
+
+function resultCell(result) {
+    var full = String(result || '');
+    var short = shortResult(full);
+    var style = 'color: ' + resultColor(full) + ';';
+    if (short === full) {
+        return '<td class="py-2 px-3" style="' + style + '">' + escapeHtml(full) + '</td>';
+    }
+    return '<td class="py-2 px-3" style="' + style + ' cursor: help;" title="' + escapeHtml(full) + '">' +
+        escapeHtml(short) + ' <span style="color: #64748b;">&hellip;</span></td>';
+}
+
 function loadActivity() {
     api.getActivity(100).then(function(resp) {
         var records = (resp.data && resp.data.activity) || [];
@@ -79,7 +112,7 @@ function loadActivity() {
                 '<td class="py-2 px-3" style="color: #e2e8f0;">' + escapeHtml(r.mappingName || '') + '</td>' +
                 '<td class="py-2 px-3" style="color: #94a3b8;">' + deviceNames(r.devices) + '</td>' +
                 '<td class="py-2 px-3">' + transportBadge(r.transport) + '</td>' +
-                '<td class="py-2 px-3" style="color: ' + resultColor(r.result) + ';">' + escapeHtml(r.result) + '</td>' +
+                resultCell(r.result) +
             '</tr>';
         }).join('');
     }).catch(function(err) {

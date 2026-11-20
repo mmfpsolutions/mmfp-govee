@@ -174,6 +174,8 @@ type Client struct {
 	breakerUntil   time.Time
 	breakerProbing bool
 	breakerErr     error
+	breakerTimer   *time.Timer   // scheduled recovery probe while open
+	cooldownFor    time.Duration // 0 = breakerCooldown; tests shorten it
 
 	cacheMu        sync.RWMutex
 	devices        []Device
